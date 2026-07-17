@@ -14,7 +14,7 @@ amount" — full traceability from source to final number.
 - [x] 80C deduction (capped)
 - [x] 80CCD(1B) NPS deduction (capped)
 - [x] Combined taxable income flow (salary → exemptions → deductions → tax)
-- [x] 80CCD(2) employer NPS deduction (allowed in both regimes)
+- [x] 80CCD(2) employer NPS deduction (allowed in both regimes; Old Regime 10% private/14% govt, New Regime 14% for everyone)
 - [x] 80G donations (simplified, 100% category)
 - [x] 80D (health insurance, self + parents, senior citizen limits)
 - [ ] Form16 / AIS / ITR import
@@ -60,6 +60,8 @@ explainable-tax-engine/
 ## A note on data privacy
 
 This repo intentionally never contains real payslips, Form16, AIS, or
-ITR files. `.gitignore` blocks common tax-document file types by
-default. If you want sample data for testing, create fake or redacted
-numbers under `data/sample/`.
+ITR files. Any real personal documents used for local testing/reference
+should be kept under a folder matched by `.gitignore` (e.g. `dist/`,
+already ignored for Python packaging purposes) so they're never staged
+or committed. If you want sample data for testing, create fake or
+redacted numbers under `data/sample/`.

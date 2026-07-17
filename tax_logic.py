@@ -103,6 +103,27 @@ def calculate_hra_exemption(
 # This block only runs when you execute THIS file directly
 # (e.g. `python3 tax_logic.py`). It will NOT run when this file
 # is imported by app.py or by another script.
+def calculate_80c_deduction(invested_amount: float) -> float:
+    """
+    Section 80C: PF, LIC, ELSS, etc. Old Regime only.
+    Capped at ₹1,50,000 regardless of how much you actually invest.
+    """
+    LIMIT = 150000
+    return round(min(invested_amount, LIMIT), 2)
+
+
+def calculate_80ccd_1b_deduction(nps_invested_amount: float) -> float:
+    """
+    Section 80CCD(1B): additional NPS investment, ON TOP OF 80C's
+    ₹1,50,000 - a separate ₹50,000 bucket. Old Regime only.
+    """
+    LIMIT = 50000
+    return round(min(nps_invested_amount, LIMIT), 2)
+
+
+# This block only runs when you execute THIS file directly
+# (e.g. `python3 tax_logic.py`). It will NOT run when this file
+# is imported by app.py or by another script.
 if __name__ == "__main__":
     test_salaries = [250000, 700000, 1000000, 1600000, 2804760]
     print("New Regime:")
@@ -123,3 +144,12 @@ if __name__ == "__main__":
         is_metro=False,  # Pune is non-metro for this rule
     )
     print(f"  Exemption: ₹{exemption:,.0f}")
+
+    print("80C Deduction (expect capped at ₹1,50,000):")
+    print(f"  Invested ₹1,50,000 -> ₹{calculate_80c_deduction(150000):,.0f}")
+    print(f"  Invested ₹2,00,000 -> ₹{calculate_80c_deduction(200000):,.0f}  (over cap)")
+    print(f"  Invested ₹1,00,000 -> ₹{calculate_80c_deduction(100000):,.0f}  (under cap)")
+
+    print("80CCD(1B) Deduction (expect capped at ₹50,000):")
+    print(f"  Invested ₹50,000 -> ₹{calculate_80ccd_1b_deduction(50000):,.0f}")
+    print(f"  Invested ₹80,000 -> ₹{calculate_80ccd_1b_deduction(80000):,.0f}  (over cap)")

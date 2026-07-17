@@ -13,11 +13,13 @@ from tax_logic import (
     calculate_new_regime_tax,
     calculate_old_regime_tax,
     calculate_hra_exemption,
+    calculate_80c_deduction,
+    calculate_80ccd_1b_deduction,
 )
 
 st.title("Explainable Tax Engine")
 
-tab1, tab2 = st.tabs(["Regime Comparison", "HRA Calculator"])
+tab1, tab2, tab3 = st.tabs(["Regime Comparison", "HRA Calculator", "Deductions (80C / NPS)"])
 
 # -----------------------------------------------------------
 # Tab 1: same as Step 2
@@ -85,3 +87,41 @@ with tab2:
     for label, value in options.items():
         won = " ← lowest (this wins)" if round(value, 2) == exemption else ""
         st.write(f"- {label}: ₹{value:,.0f}{won}")
+
+# -----------------------------------------------------------
+# Tab 3: new - Deductions (80C / 80CCD(1B))
+# -----------------------------------------------------------
+with tab3:
+    st.caption("Old Regime only - New Regime disallows both of these")
+
+    st.subheader("Section 80C")
+    st.write("PF, LIC, ELSS, tuition fees, etc. Combined cap: ₹1,50,000")
+    invested_80c = st.number_input(
+        "Total 80C investments (₹, annual)", min_value=0, value=150000
+    )
+    deduction_80c = calculate_80c_deduction(invested_80c)
+    st.metric(label="80C Deduction Allowed", value=f"₹{deduction_80c:,.0f}")
+    if invested_80c > 150000:
+        st.caption(
+            f"You invested ₹{invested_80c:,.0f}, but only ₹1,50,000 is "
+            f"allowed - the extra ₹{invested_80c - 150000:,.0f} gets no benefit."
+        )
+
+    st.divider()
+
+    st.subheader("Section 80CCD(1B)")
+    st.write("Additional NPS investment, separate from 80C. Cap: ₹50,000")
+    invested_nps = st.number_input(
+        "NPS investment under 80CCD(1B) (₹, annual)", min_value=0, value=50000
+    )
+    deduction_nps = calculate_80ccd_1b_deduction(invested_nps)
+    st.metric(label="80CCD(1B) Deduction Allowed", value=f"₹{deduction_nps:,.0f}")
+    if invested_nps > 50000:
+        st.caption(
+            f"You invested ₹{invested_nps:,.0f}, but only ₹50,000 is "
+            f"allowed - the extra ₹{invested_nps - 50000:,.0f} gets no benefit."
+        )
+
+    st.divider()
+    total_deductions = deduction_80c + deduction_nps
+    st.metric(label="Total Deductions (80C + 80CCD(1B))", value=f"₹{total_deductions:,.0f}")

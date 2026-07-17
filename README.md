@@ -16,7 +16,7 @@ amount" — full traceability from source to final number.
 - [x] Combined taxable income flow (salary → exemptions → deductions → tax)
 - [x] 80CCD(2) employer NPS deduction (allowed in both regimes)
 - [x] 80G donations (simplified, 100% category)
-- [ ] 80D (health insurance)
+- [x] 80D (health insurance, self + parents, senior citizen limits)
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

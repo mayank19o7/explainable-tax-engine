@@ -17,6 +17,7 @@ from tax_logic import (
     calculate_80ccd_1b_deduction,
     calculate_80ccd_2_deduction,
     calculate_80g_deduction,
+    calculate_80d_deduction,
     compute_taxable_income,
     STANDARD_DEDUCTION_OLD_REGIME,
     STANDARD_DEDUCTION_NEW_REGIME,
@@ -25,7 +26,7 @@ from tax_logic import (
 st.title("Explainable Tax Engine")
 
 tab1, tab2, tab3, tab4 = st.tabs(
-    ["Regime Comparison", "HRA Calculator", "Deductions (80C / NPS)", "Full Computation"]
+    ["Regime Comparison", "HRA Calculator", "Deductions (80C / NPS / 80D)", "Full Computation"]
 )
 
 # -----------------------------------------------------------
@@ -130,8 +131,31 @@ with tab3:
         )
 
     st.divider()
-    total_deductions = deduction_80c + deduction_nps
-    st.metric(label="Total Deductions (80C + 80CCD(1B))", value=f"₹{total_deductions:,.0f}")
+
+    st.subheader("Section 80D")
+    st.write(
+        "Health insurance premiums. Self+family cap ₹25,000 (₹50,000 if "
+        "senior citizen). Parents cap ₹25,000 (₹50,000 if senior citizen)."
+    )
+    d1, d2 = st.columns(2)
+    with d1:
+        premium_self = st.number_input(
+            "Self + family premium (₹, annual)", min_value=0, value=25000
+        )
+        self_senior = st.checkbox("I am a senior citizen (60+)", value=False)
+    with d2:
+        premium_parents = st.number_input(
+            "Parents' premium (₹, annual)", min_value=0, value=0
+        )
+        parents_senior = st.checkbox("Parents are senior citizens (60+)", value=False)
+    deduction_80d = calculate_80d_deduction(
+        premium_self, premium_parents, self_senior, parents_senior
+    )
+    st.metric(label="80D Deduction Allowed", value=f"₹{deduction_80d:,.0f}")
+
+    st.divider()
+    total_deductions = deduction_80c + deduction_nps + deduction_80d
+    st.metric(label="Total Deductions (80C + 80CCD(1B) + 80D)", value=f"₹{total_deductions:,.0f}")
 
 # -----------------------------------------------------------
 # Tab 4: new - Full Computation (everything combined)
@@ -199,6 +223,20 @@ with tab4:
         "Donation amount (₹, annual)", min_value=0, value=550, key="full_donation"
     )
 
+    st.write("**80D - Health Insurance (Old Regime only)**")
+    st.caption("Self+family cap ₹25,000 (₹50,000 senior). Parents cap ₹25,000 (₹50,000 senior).")
+    d1, d2 = st.columns(2)
+    with d1:
+        full_premium_self = st.number_input(
+            "Self + family premium (₹, annual)", min_value=0, value=0, key="full_premium_self"
+        )
+        full_self_senior = st.checkbox("I am a senior citizen (60+)", value=False, key="full_self_senior")
+    with d2:
+        full_premium_parents = st.number_input(
+            "Parents' premium (₹, annual)", min_value=0, value=0, key="full_premium_parents"
+        )
+        full_parents_senior = st.checkbox("Parents are senior citizens (60+)", value=False, key="full_parents_senior")
+
     # --- Old Regime: everything applies ---
     hra_exemption = calculate_hra_exemption(
         full_basic, full_hra_received, full_rent_paid, full_is_metro
@@ -207,6 +245,9 @@ with tab4:
     deduction_80ccd_1b = calculate_80ccd_1b_deduction(full_nps)
     deduction_80ccd_2 = calculate_80ccd_2_deduction(full_employer_nps, full_basic)
     deduction_80g = calculate_80g_deduction(full_donation, fully_exempt=True)
+    deduction_80d = calculate_80d_deduction(
+        full_premium_self, full_premium_parents, full_self_senior, full_parents_senior
+    )
 
     taxable_income_old = compute_taxable_income(
         gross_salary=gross_salary,
@@ -217,6 +258,7 @@ with tab4:
         deduction_80ccd_1b=deduction_80ccd_1b,
         deduction_80ccd_2=deduction_80ccd_2,
         deduction_80g=deduction_80g,
+        deduction_80d=deduction_80d,
     )
     tax_old = calculate_old_regime_tax(taxable_income_old)
 
@@ -241,13 +283,14 @@ with tab4:
         st.write(f"80CCD(1B) Deduction: ₹{deduction_80ccd_1b:,.0f}")
         st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}")
         st.write(f"80G Deduction: ₹{deduction_80g:,.0f}")
+        st.write(f"80D Deduction: ₹{deduction_80d:,.0f}")
         st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
         st.metric("Tax", f"₹{tax_old:,.0f}")
     with rc2:
         st.markdown("**New Regime**")
         st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_NEW_REGIME:,.0f}")
         st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}  (only deduction New Regime allows)")
-        st.write("HRA / 80C / 80CCD(1B) / PT / 80G: not allowed")
+        st.write("HRA / 80C / 80CCD(1B) / PT / 80G / 80D: not allowed")
         st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
         st.metric("Tax", f"₹{tax_new:,.0f}")
 

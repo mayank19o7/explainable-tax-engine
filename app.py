@@ -15,11 +15,16 @@ from tax_logic import (
     calculate_hra_exemption,
     calculate_80c_deduction,
     calculate_80ccd_1b_deduction,
+    compute_taxable_income,
+    STANDARD_DEDUCTION_OLD_REGIME,
+    STANDARD_DEDUCTION_NEW_REGIME,
 )
 
 st.title("Explainable Tax Engine")
 
-tab1, tab2, tab3 = st.tabs(["Regime Comparison", "HRA Calculator", "Deductions (80C / NPS)"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["Regime Comparison", "HRA Calculator", "Deductions (80C / NPS)", "Full Computation"]
+)
 
 # -----------------------------------------------------------
 # Tab 1: same as Step 2
@@ -125,3 +130,95 @@ with tab3:
     st.divider()
     total_deductions = deduction_80c + deduction_nps
     st.metric(label="Total Deductions (80C + 80CCD(1B))", value=f"₹{total_deductions:,.0f}")
+
+# -----------------------------------------------------------
+# Tab 4: new - Full Computation (everything combined)
+# -----------------------------------------------------------
+with tab4:
+    st.caption(
+        "One flow: gross salary → exemptions/deductions → taxable income "
+        "→ tax, computed separately per regime, since each regime allows "
+        "different things."
+    )
+
+    st.subheader("Your Inputs (annual figures)")
+    gross_salary = st.number_input(
+        "Gross Salary (₹, annual)", min_value=0, value=2910444, key="full_gross"
+    )
+    professional_tax = st.number_input(
+        "Professional Tax paid (₹, annual, Old Regime only)",
+        min_value=0, value=2500, key="full_pt",
+    )
+
+    st.write("**HRA inputs (Old Regime only)**")
+    fc1, fc2 = st.columns(2)
+    with fc1:
+        full_basic = st.number_input("Basic Salary (₹, annual)", min_value=0, value=1187094, key="full_basic")
+        full_hra_received = st.number_input("HRA Received (₹, annual)", min_value=0, value=593549, key="full_hra")
+    with fc2:
+        full_rent_paid = st.number_input("Rent Paid (₹, annual)", min_value=0, value=250000, key="full_rent")
+        full_is_metro = st.checkbox("Metro city", value=False, key="full_metro")
+
+    st.write("**Investment inputs (Old Regime only)**")
+    fc3, fc4 = st.columns(2)
+    with fc3:
+        full_80c = st.number_input("80C investments (₹, annual)", min_value=0, value=150000, key="full_80c")
+    with fc4:
+        full_nps = st.number_input("80CCD(1B) NPS (₹, annual)", min_value=0, value=50000, key="full_nps")
+
+    # --- Old Regime: everything applies ---
+    hra_exemption = calculate_hra_exemption(
+        full_basic, full_hra_received, full_rent_paid, full_is_metro
+    )
+    deduction_80c = calculate_80c_deduction(full_80c)
+    deduction_80ccd_1b = calculate_80ccd_1b_deduction(full_nps)
+
+    taxable_income_old = compute_taxable_income(
+        gross_salary=gross_salary,
+        standard_deduction=STANDARD_DEDUCTION_OLD_REGIME,
+        professional_tax=professional_tax,
+        hra_exemption=hra_exemption,
+        deduction_80c=deduction_80c,
+        deduction_80ccd_1b=deduction_80ccd_1b,
+    )
+    tax_old = calculate_old_regime_tax(taxable_income_old)
+
+    # --- New Regime: none of HRA/80C/80CCD(1B)/PT apply ---
+    taxable_income_new = compute_taxable_income(
+        gross_salary=gross_salary,
+        standard_deduction=STANDARD_DEDUCTION_NEW_REGIME,
+    )
+    tax_new = calculate_new_regime_tax(taxable_income_new)
+
+    st.divider()
+    st.subheader("Result")
+
+    rc1, rc2 = st.columns(2)
+    with rc1:
+        st.markdown("**Old Regime**")
+        st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_OLD_REGIME:,.0f}")
+        st.write(f"Professional Tax: ₹{professional_tax:,.0f}")
+        st.write(f"HRA Exemption: ₹{hra_exemption:,.0f}")
+        st.write(f"80C Deduction: ₹{deduction_80c:,.0f}")
+        st.write(f"80CCD(1B) Deduction: ₹{deduction_80ccd_1b:,.0f}")
+        st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
+        st.metric("Tax", f"₹{tax_old:,.0f}")
+    with rc2:
+        st.markdown("**New Regime**")
+        st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_NEW_REGIME:,.0f}")
+        st.write("HRA / 80C / 80CCD(1B) / PT: not allowed")
+        st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
+        st.metric("Tax", f"₹{tax_new:,.0f}")
+
+    st.divider()
+    if tax_old < tax_new:
+        st.success(f"Choose Old Regime. Tax Saving = ₹{tax_new - tax_old:,.0f}")
+    elif tax_new < tax_old:
+        st.success(f"Choose New Regime. Tax Saving = ₹{tax_old - tax_new:,.0f}")
+    else:
+        st.info("Both regimes result in the same tax.")
+
+    st.caption(
+        "Note: this doesn't yet include 80D, 80G, or 80CCD(2) (employer NPS), "
+        "so totals will differ slightly from a real Form16 until those are added."
+    )

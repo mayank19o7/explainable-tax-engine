@@ -7,23 +7,54 @@ Keeping this separate means:
   know HOW tax is calculated, only WHAT the answer is.
 """
 
+# ---------------------------------------------------------------
+# Deduction/exemption limits (all in ₹, annual, FY 2024-25 rules).
+# Kept as named constants (rather than buried inside functions) so
+# they're easy to find, reuse, and eventually override per-year.
+# ---------------------------------------------------------------
+LIMIT_80C = 150000
+LIMIT_80CCD_1B = 50000
+LIMIT_80D_NORMAL = 25000
+LIMIT_80D_SENIOR_CITIZEN = 50000
 
-def calculate_new_regime_tax(taxable_income: float) -> float:
+EMPLOYER_NPS_RATE = 0.10  # 80CCD(2) cap: 10% of Basic (private sector)
+
+HRA_RENT_THRESHOLD_RATE = 0.10  # rent paid minus 10% of Basic
+HRA_METRO_RATE = 0.50
+HRA_NON_METRO_RATE = 0.40
+
+# Standard deduction differs by regime (Budget 2024 revision).
+STANDARD_DEDUCTION_OLD_REGIME = 50000
+STANDARD_DEDUCTION_NEW_REGIME = 75000
+
+# (upper limit of slab, tax rate for that slab)
+NEW_REGIME_SLABS = [
+    (300000, 0.00),
+    (700000, 0.05),
+    (1000000, 0.10),
+    (1200000, 0.15),
+    (1500000, 0.20),
+    (float("inf"), 0.30),
+]
+
+OLD_REGIME_SLABS = [
+    (250000, 0.00),
+    (500000, 0.05),
+    (1000000, 0.20),
+    (float("inf"), 0.30),
+]
+
+
+def calculate_slab_tax(taxable_income: float, slabs: list) -> float:
     """
-    Calculates tax using India's New Regime slabs for FY 2024-25
-    (AY 2025-26), as revised in Budget 2024.
+    Generic progressive slab-tax calculator: walks through `slabs`
+    (a list of (upper_limit, rate) tuples, in ascending order) and
+    taxes each portion of income at its own bracket's rate.
+
+    Both New Regime and Old Regime use this same logic - only the
+    slab table differs, so it lives here once instead of being
+    duplicated per regime.
     """
-
-    # (upper limit of slab, tax rate for that slab)
-    slabs = [
-        (300000, 0.00),
-        (700000, 0.05),
-        (1000000, 0.10),
-        (1200000, 0.15),
-        (1500000, 0.20),
-        (float("inf"), 0.30),
-    ]
-
     tax = 0.0
     previous_limit = 0
 
@@ -39,35 +70,20 @@ def calculate_new_regime_tax(taxable_income: float) -> float:
     return round(tax, 2)
 
 
+def calculate_new_regime_tax(taxable_income: float) -> float:
+    """
+    Calculates tax using India's New Regime slabs for FY 2024-25
+    (AY 2025-26), as revised in Budget 2024.
+    """
+    return calculate_slab_tax(taxable_income, NEW_REGIME_SLABS)
+
+
 def calculate_old_regime_tax(taxable_income: float) -> float:
     """
     Calculates tax using the Old Regime slabs (FY 2024-25),
     for a taxpayer below 60 years of age.
-
-    Same shape as calculate_new_regime_tax - only the `slabs`
-    table differs. That repetition is a hint we could later merge
-    these into one function taking a slab table as an argument.
     """
-
-    slabs = [
-        (250000, 0.00),
-        (500000, 0.05),
-        (1000000, 0.20),
-        (float("inf"), 0.30),
-    ]
-
-    tax = 0.0
-    previous_limit = 0
-
-    for limit, rate in slabs:
-        if taxable_income > previous_limit:
-            slab_income = min(taxable_income, limit) - previous_limit
-            tax += slab_income * rate
-            previous_limit = limit
-        else:
-            break
-
-    return round(tax, 2)
+    return calculate_slab_tax(taxable_income, OLD_REGIME_SLABS)
 
 
 # This block only runs when you execute THIS file directly
@@ -93,8 +109,8 @@ def calculate_hra_exemption(
     """
 
     option_1 = hra_received
-    option_2 = max(0, rent_paid - (0.10 * basic))  # can't go negative
-    option_3 = basic * (0.50 if is_metro else 0.40)
+    option_2 = max(0, rent_paid - (HRA_RENT_THRESHOLD_RATE * basic))  # can't go negative
+    option_3 = basic * (HRA_METRO_RATE if is_metro else HRA_NON_METRO_RATE)
 
     exemption = min(option_1, option_2, option_3)
     return round(exemption, 2)
@@ -108,8 +124,7 @@ def calculate_80c_deduction(invested_amount: float) -> float:
     Section 80C: PF, LIC, ELSS, etc. Old Regime only.
     Capped at ₹1,50,000 regardless of how much you actually invest.
     """
-    LIMIT = 150000
-    return round(min(invested_amount, LIMIT), 2)
+    return round(min(invested_amount, LIMIT_80C), 2)
 
 
 def calculate_80ccd_1b_deduction(nps_invested_amount: float) -> float:
@@ -117,13 +132,7 @@ def calculate_80ccd_1b_deduction(nps_invested_amount: float) -> float:
     Section 80CCD(1B): additional NPS investment, ON TOP OF 80C's
     ₹1,50,000 - a separate ₹50,000 bucket. Old Regime only.
     """
-    LIMIT = 50000
-    return round(min(nps_invested_amount, LIMIT), 2)
-
-
-# Standard deduction differs by regime (Budget 2024 revision).
-STANDARD_DEDUCTION_OLD_REGIME = 50000
-STANDARD_DEDUCTION_NEW_REGIME = 75000
+    return round(min(nps_invested_amount, LIMIT_80CCD_1B), 2)
 
 
 def compute_taxable_income(
@@ -173,7 +182,7 @@ def calculate_80ccd_2_deduction(
     Capped at 10% of Basic Salary (private sector employees;
     government employees get 14%, not handled here yet).
     """
-    limit = 0.10 * basic_salary
+    limit = EMPLOYER_NPS_RATE * basic_salary
     return round(min(employer_nps_contribution, limit), 2)
 
 
@@ -193,8 +202,8 @@ def calculate_80d_deduction(
     So a taxpayer with senior citizen parents could claim up to
     ₹25,000 (self) + ₹50,000 (senior parents) = ₹75,000 total.
     """
-    limit_self = 50000 if self_senior_citizen else 25000
-    limit_parents = 50000 if parents_senior_citizen else 25000
+    limit_self = LIMIT_80D_SENIOR_CITIZEN if self_senior_citizen else LIMIT_80D_NORMAL
+    limit_parents = LIMIT_80D_SENIOR_CITIZEN if parents_senior_citizen else LIMIT_80D_NORMAL
 
     deduction_self = min(premium_self_family, limit_self)
     deduction_parents = min(premium_parents, limit_parents)

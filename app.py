@@ -1,11 +1,11 @@
 """
-Explainable Tax Engine - Step 3
+Explainable Tax Engine
 --------------------------------
 UI layer only. Actual tax math lives in tax_logic.py
 
-New this step: HRA exemption calculator, with a breakdown of
-which of the three formula options actually won (the "explain"
-part of the plan).
+Tabs so far: Regime Comparison, HRA Calculator, and a Full
+Computation flow combining everything (salary -> exemptions ->
+deductions -> tax, per regime, including 80C/80CCD(1B)/80CCD(2)/80D/80G).
 """
 
 import streamlit as st
@@ -21,12 +21,16 @@ from tax_logic import (
     compute_taxable_income,
     STANDARD_DEDUCTION_OLD_REGIME,
     STANDARD_DEDUCTION_NEW_REGIME,
+    LIMIT_80C,
+    LIMIT_80CCD_1B,
+    LIMIT_80D_NORMAL,
+    LIMIT_80D_SENIOR_CITIZEN,
 )
 
 st.title("Explainable Tax Engine")
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Regime Comparison", "HRA Calculator", "Deductions (80C / NPS / 80D)", "Full Computation"]
+tab1, tab2, tab3 = st.tabs(
+    ["Regime Comparison", "HRA Calculator", "Full Computation"]
 )
 
 # -----------------------------------------------------------
@@ -97,145 +101,113 @@ with tab2:
         st.write(f"- {label}: ₹{value:,.0f}{won}")
 
 # -----------------------------------------------------------
-# Tab 3: new - Deductions (80C / 80CCD(1B))
+# Tab 3: Full Computation (everything combined)
 # -----------------------------------------------------------
 with tab3:
-    st.caption("Old Regime only - New Regime disallows both of these")
-
-    st.subheader("Section 80C")
-    st.write("PF, LIC, ELSS, tuition fees, etc. Combined cap: ₹1,50,000")
-    invested_80c = st.number_input(
-        "Total 80C investments (₹, annual)", min_value=0, value=150000
-    )
-    deduction_80c = calculate_80c_deduction(invested_80c)
-    st.metric(label="80C Deduction Allowed", value=f"₹{deduction_80c:,.0f}")
-    if invested_80c > 150000:
-        st.caption(
-            f"You invested ₹{invested_80c:,.0f}, but only ₹1,50,000 is "
-            f"allowed - the extra ₹{invested_80c - 150000:,.0f} gets no benefit."
-        )
-
-    st.divider()
-
-    st.subheader("Section 80CCD(1B)")
-    st.write("Additional NPS investment, separate from 80C. Cap: ₹50,000")
-    invested_nps = st.number_input(
-        "NPS investment under 80CCD(1B) (₹, annual)", min_value=0, value=50000
-    )
-    deduction_nps = calculate_80ccd_1b_deduction(invested_nps)
-    st.metric(label="80CCD(1B) Deduction Allowed", value=f"₹{deduction_nps:,.0f}")
-    if invested_nps > 50000:
-        st.caption(
-            f"You invested ₹{invested_nps:,.0f}, but only ₹50,000 is "
-            f"allowed - the extra ₹{invested_nps - 50000:,.0f} gets no benefit."
-        )
-
-    st.divider()
-
-    st.subheader("Section 80D")
-    st.write(
-        "Health insurance premiums. Self+family cap ₹25,000 (₹50,000 if "
-        "senior citizen). Parents cap ₹25,000 (₹50,000 if senior citizen)."
-    )
-    d1, d2 = st.columns(2)
-    with d1:
-        premium_self = st.number_input(
-            "Self + family premium (₹, annual)", min_value=0, value=25000
-        )
-        self_senior = st.checkbox("I am a senior citizen (60+)", value=False)
-    with d2:
-        premium_parents = st.number_input(
-            "Parents' premium (₹, annual)", min_value=0, value=0
-        )
-        parents_senior = st.checkbox("Parents are senior citizens (60+)", value=False)
-    deduction_80d = calculate_80d_deduction(
-        premium_self, premium_parents, self_senior, parents_senior
-    )
-    st.metric(label="80D Deduction Allowed", value=f"₹{deduction_80d:,.0f}")
-
-    st.divider()
-    total_deductions = deduction_80c + deduction_nps + deduction_80d
-    st.metric(label="Total Deductions (80C + 80CCD(1B) + 80D)", value=f"₹{total_deductions:,.0f}")
-
-# -----------------------------------------------------------
-# Tab 4: new - Full Computation (everything combined)
-# -----------------------------------------------------------
-with tab4:
     st.caption(
         "One flow: gross salary → exemptions/deductions → taxable income "
         "→ tax, computed separately per regime, since each regime allows "
         "different things."
     )
 
-    st.subheader("Gross Salary")
-    st.caption("Total salary before any exemptions/deductions. No limit.")
-    gross_salary = st.number_input(
-        "Gross Salary (₹, annual)", min_value=0, value=2910444, key="full_gross"
-    )
-
-    st.subheader("Professional Tax")
-    st.caption("State-level tax on your payslip, Old Regime only. Limit: ~₹2,500/year (varies by state).")
-    professional_tax = st.number_input(
-        "Professional Tax paid (₹, annual)",
-        min_value=0, value=2500, key="full_pt",
-    )
-
-    st.write("**HRA inputs (Old Regime only)**")
-    st.caption("Rent exemption under Sec 10(13A). Limit: least of HRA received, rent − 10% of Basic, or 40%/50% of Basic.")
-    fc1, fc2 = st.columns(2)
-    with fc1:
-        full_basic = st.number_input("Basic Salary (₹, annual)", min_value=0, value=1187094, key="full_basic")
-        full_hra_received = st.number_input("HRA Received (₹, annual)", min_value=0, value=593549, key="full_hra")
-    with fc2:
-        full_rent_paid = st.number_input("Rent Paid (₹, annual)", min_value=0, value=250000, key="full_rent")
-        full_is_metro = st.checkbox("Metro city", value=False, key="full_metro")
-
-    st.write("**Investment inputs (Old Regime only)**")
-    st.caption("80C: PF/LIC/ELSS/tuition, capped ₹1,50,000. 80CCD(1B): extra NPS, capped ₹50,000.")
-    fc3, fc4 = st.columns(2)
-    with fc3:
-        full_80c = st.number_input("80C investments (₹, annual)", min_value=0, value=150000, key="full_80c")
-    with fc4:
-        full_nps = st.number_input("80CCD(1B) NPS (₹, annual)", min_value=0, value=50000, key="full_nps")
-
-    st.write("**80CCD(2) - Employer NPS (allowed in BOTH regimes)**")
-    st.caption("Employer's own NPS contribution. Limit: 10% of Basic Salary (private sector).")
-    suggested_employer_nps = round(0.10 * full_basic, 2)
-    auto_calc_nps = st.checkbox(
-        "Auto-calculate as 10% of Basic Salary (recommended)",
-        value=True,
-        key="full_nps_auto",
-    )
-    if auto_calc_nps:
-        full_employer_nps = suggested_employer_nps
-        st.info(f"Auto-set to 10% of Basic (₹{full_basic:,.0f}) = ₹{full_employer_nps:,.0f}")
-    else:
-        full_employer_nps = st.number_input(
-            "Employer's NPS contribution (₹, annual)",
-            min_value=0,
-            value=int(suggested_employer_nps),
-            key="full_employer_nps_manual",
+    with st.container(border=True):
+        st.subheader("💰 Gross Salary")
+        st.caption("Total salary before any exemptions/deductions. No limit.")
+        gross_salary = st.number_input(
+            "Gross Salary (₹, annual)", min_value=0, value=2910444, key="full_gross"
         )
 
-    st.write("**80G - Donations (Old Regime only, simplified to 100% category)**")
-    st.caption("Donations to eligible charities. Limit: no cap in this simplified 100%-deductible category.")
-    full_donation = st.number_input(
-        "Donation amount (₹, annual)", min_value=0, value=550, key="full_donation"
-    )
+    with st.container(border=True):
+        st.subheader("🏛️ Professional Tax")
+        st.caption("State-level tax on your payslip, Old Regime only. Limit: ~₹2,500/year (varies by state).")
+        professional_tax = st.number_input(
+            "Professional Tax paid (₹, annual)",
+            min_value=0, value=2500, key="full_pt",
+        )
 
-    st.write("**80D - Health Insurance (Old Regime only)**")
-    st.caption("Self+family cap ₹25,000 (₹50,000 senior). Parents cap ₹25,000 (₹50,000 senior).")
-    d1, d2 = st.columns(2)
-    with d1:
-        full_premium_self = st.number_input(
-            "Self + family premium (₹, annual)", min_value=0, value=0, key="full_premium_self"
+    with st.container(border=True):
+        st.subheader("🏠 HRA (Old Regime only)")
+        st.caption("Rent exemption under Sec 10(13A). Limit: least of HRA received, rent − 10% of Basic, or 40%/50% of Basic.")
+        fc1, fc2 = st.columns(2)
+        with fc1:
+            full_basic = st.number_input("Basic Salary (₹, annual)", min_value=0, value=1187094, key="full_basic")
+            full_hra_received = st.number_input("HRA Received (₹, annual)", min_value=0, value=593549, key="full_hra")
+        with fc2:
+            full_rent_paid = st.number_input("Rent Paid (₹, annual)", min_value=0, value=250000, key="full_rent")
+            full_is_metro = st.checkbox("Metro city", value=False, key="full_metro")
+
+    with st.container(border=True):
+        st.subheader("📈 Section 80C / 80CCD(1B) - Investments (Old Regime only)")
+        st.caption("80C: PF/LIC/ELSS/tuition, capped ₹1,50,000. 80CCD(1B): extra NPS, capped ₹50,000.")
+        fc3, fc4 = st.columns(2)
+        with fc3:
+            full_80c = st.number_input("80C investments (₹, annual)", min_value=0, value=150000, key="full_80c")
+            if full_80c > LIMIT_80C:
+                st.caption(
+                    f"Only ₹{LIMIT_80C:,.0f} allowed - the extra "
+                    f"₹{full_80c - LIMIT_80C:,.0f} gets no benefit."
+                )
+        with fc4:
+            full_nps = st.number_input("80CCD(1B) NPS (₹, annual)", min_value=0, value=50000, key="full_nps")
+            if full_nps > LIMIT_80CCD_1B:
+                st.caption(
+                    f"Only ₹{LIMIT_80CCD_1B:,.0f} allowed - the extra "
+                    f"₹{full_nps - LIMIT_80CCD_1B:,.0f} gets no benefit."
+                )
+
+    with st.container(border=True):
+        st.subheader("🏢 Section 80CCD(2) - Employer NPS (allowed in BOTH regimes)")
+        st.caption("Employer's own NPS contribution. Limit: 10% of Basic Salary (private sector).")
+        suggested_employer_nps = round(0.10 * full_basic, 2)
+        auto_calc_nps = st.checkbox(
+            "Auto-calculate as 10% of Basic Salary (recommended)",
+            value=True,
+            key="full_nps_auto",
         )
-        full_self_senior = st.checkbox("I am a senior citizen (60+)", value=False, key="full_self_senior")
-    with d2:
-        full_premium_parents = st.number_input(
-            "Parents' premium (₹, annual)", min_value=0, value=0, key="full_premium_parents"
+        if auto_calc_nps:
+            full_employer_nps = suggested_employer_nps
+            st.info(f"Auto-set to 10% of Basic (₹{full_basic:,.0f}) = ₹{full_employer_nps:,.0f}")
+        else:
+            full_employer_nps = st.number_input(
+                "Employer's NPS contribution (₹, annual)",
+                min_value=0,
+                value=int(suggested_employer_nps),
+                key="full_employer_nps_manual",
+            )
+
+    with st.container(border=True):
+        st.subheader("🎗️ Section 80G - Donations (Old Regime only)")
+        st.caption("Donations to eligible charities. Limit: no cap in this simplified 100%-deductible category.")
+        full_donation = st.number_input(
+            "Donation amount (₹, annual)", min_value=0, value=550, key="full_donation"
         )
-        full_parents_senior = st.checkbox("Parents are senior citizens (60+)", value=False, key="full_parents_senior")
+
+    with st.container(border=True):
+        st.subheader("🏥 Section 80D - Health Insurance (Old Regime only)")
+        st.caption("Self+family cap ₹25,000 (₹50,000 senior). Parents cap ₹25,000 (₹50,000 senior).")
+        d1, d2 = st.columns(2)
+        with d1:
+            full_premium_self = st.number_input(
+                "Self + family premium (₹, annual)", min_value=0, value=0, key="full_premium_self"
+            )
+            full_self_senior = st.checkbox("I am a senior citizen (60+)", value=False, key="full_self_senior")
+            limit_self = LIMIT_80D_SENIOR_CITIZEN if full_self_senior else LIMIT_80D_NORMAL
+            if full_premium_self > limit_self:
+                st.caption(
+                    f"Only ₹{limit_self:,.0f} allowed - the extra "
+                    f"₹{full_premium_self - limit_self:,.0f} gets no benefit."
+                )
+        with d2:
+            full_premium_parents = st.number_input(
+                "Parents' premium (₹, annual)", min_value=0, value=0, key="full_premium_parents"
+            )
+            full_parents_senior = st.checkbox("Parents are senior citizens (60+)", value=False, key="full_parents_senior")
+            limit_parents = LIMIT_80D_SENIOR_CITIZEN if full_parents_senior else LIMIT_80D_NORMAL
+            if full_premium_parents > limit_parents:
+                st.caption(
+                    f"Only ₹{limit_parents:,.0f} allowed - the extra "
+                    f"₹{full_premium_parents - limit_parents:,.0f} gets no benefit."
+                )
 
     # --- Old Regime: everything applies ---
     hra_exemption = calculate_hra_exemption(
@@ -271,36 +243,37 @@ with tab4:
     tax_new = calculate_new_regime_tax(taxable_income_new)
 
     st.divider()
-    st.subheader("Result")
+    st.subheader("🧾 Result")
 
-    rc1, rc2 = st.columns(2)
-    with rc1:
-        st.markdown("**Old Regime**")
-        st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_OLD_REGIME:,.0f}")
-        st.write(f"Professional Tax: ₹{professional_tax:,.0f}")
-        st.write(f"HRA Exemption: ₹{hra_exemption:,.0f}")
-        st.write(f"80C Deduction: ₹{deduction_80c:,.0f}")
-        st.write(f"80CCD(1B) Deduction: ₹{deduction_80ccd_1b:,.0f}")
-        st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}")
-        st.write(f"80G Deduction: ₹{deduction_80g:,.0f}")
-        st.write(f"80D Deduction: ₹{deduction_80d:,.0f}")
-        st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
-        st.metric("Tax", f"₹{tax_old:,.0f}")
-    with rc2:
-        st.markdown("**New Regime**")
-        st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_NEW_REGIME:,.0f}")
-        st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}  (only deduction New Regime allows)")
-        st.write("HRA / 80C / 80CCD(1B) / PT / 80G / 80D: not allowed")
-        st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
-        st.metric("Tax", f"₹{tax_new:,.0f}")
+    with st.container(border=True):
+        rc1, rc2 = st.columns(2)
+        with rc1:
+            st.markdown("**Old Regime**")
+            st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_OLD_REGIME:,.0f}")
+            st.write(f"Professional Tax: ₹{professional_tax:,.0f}")
+            st.write(f"HRA Exemption: ₹{hra_exemption:,.0f}")
+            st.write(f"80C Deduction: ₹{deduction_80c:,.0f}")
+            st.write(f"80CCD(1B) Deduction: ₹{deduction_80ccd_1b:,.0f}")
+            st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}")
+            st.write(f"80G Deduction: ₹{deduction_80g:,.0f}")
+            st.write(f"80D Deduction: ₹{deduction_80d:,.0f}")
+            st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
+            st.metric("Tax", f"₹{tax_old:,.0f}")
+        with rc2:
+            st.markdown("**New Regime**")
+            st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_NEW_REGIME:,.0f}")
+            st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}  (only deduction New Regime allows)")
+            st.write("HRA / 80C / 80CCD(1B) / PT / 80G / 80D: not allowed")
+            st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
+            st.metric("Tax", f"₹{tax_new:,.0f}")
 
-    st.divider()
-    if tax_old < tax_new:
-        st.success(f"Choose Old Regime. Tax Saving = ₹{tax_new - tax_old:,.0f}")
-    elif tax_new < tax_old:
-        st.success(f"Choose New Regime. Tax Saving = ₹{tax_old - tax_new:,.0f}")
-    else:
-        st.info("Both regimes result in the same tax.")
+        st.divider()
+        if tax_old < tax_new:
+            st.success(f"Choose Old Regime. Tax Saving = ₹{tax_new - tax_old:,.0f}")
+        elif tax_new < tax_old:
+            st.success(f"Choose New Regime. Tax Saving = ₹{tax_old - tax_new:,.0f}")
+        else:
+            st.info("Both regimes result in the same tax.")
 
     st.caption(
         "Note: 80CCD(2) here is capped at 10% of Basic. Some employers "

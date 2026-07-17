@@ -135,6 +135,7 @@ def compute_taxable_income(
     deduction_80ccd_1b: float = 0,
     deduction_80ccd_2: float = 0,
     deduction_80g: float = 0,
+    deduction_80d: float = 0,
 ) -> float:
     """
     Combines everything we've built so far into one taxable income number.
@@ -156,6 +157,7 @@ def compute_taxable_income(
         - deduction_80ccd_1b
         - deduction_80ccd_2
         - deduction_80g
+        - deduction_80d
     )
     return max(0, round(taxable, 2))  # taxable income can't go negative
 
@@ -173,6 +175,31 @@ def calculate_80ccd_2_deduction(
     """
     limit = 0.10 * basic_salary
     return round(min(employer_nps_contribution, limit), 2)
+
+
+def calculate_80d_deduction(
+    premium_self_family: float,
+    premium_parents: float = 0,
+    self_senior_citizen: bool = False,
+    parents_senior_citizen: bool = False,
+) -> float:
+    """
+    Section 80D: health insurance premiums. Old Regime only.
+
+    Two separate buckets, each capped on its own (not combined):
+      - Self + family: ₹25,000 normally, ₹50,000 if self is a senior citizen (60+).
+      - Parents: ₹25,000 normally, ₹50,000 if parents are senior citizens (60+).
+
+    So a taxpayer with senior citizen parents could claim up to
+    ₹25,000 (self) + ₹50,000 (senior parents) = ₹75,000 total.
+    """
+    limit_self = 50000 if self_senior_citizen else 25000
+    limit_parents = 50000 if parents_senior_citizen else 25000
+
+    deduction_self = min(premium_self_family, limit_self)
+    deduction_parents = min(premium_parents, limit_parents)
+
+    return round(deduction_self + deduction_parents, 2)
 
 
 def calculate_80g_deduction(donation_amount: float, fully_exempt: bool = True) -> float:
@@ -263,3 +290,13 @@ if __name__ == "__main__":
     print(f"  80G deduction: ₹{deduction_80g:,.0f}")
     print(f"  Taxable Income (Old Regime, v2): ₹{taxable_old_v2:,.0f}")
     print(f"  Remaining gap vs payslip's ₹23,72,400: ₹{taxable_old_v2 - 2372400:,.0f}")
+
+    print("80D Deduction (health insurance, expect self=25,000 capped, parents=50,000 senior-capped):")
+    deduction_80d = calculate_80d_deduction(
+        premium_self_family=30000,
+        premium_parents=60000,
+        self_senior_citizen=False,
+        parents_senior_citizen=True,
+    )
+    print(f"  Self+family premium ₹30,000 (cap ₹25,000) + Parents premium ₹60,000, "
+          f"senior citizens (cap ₹50,000) -> Deduction: ₹{deduction_80d:,.0f}")

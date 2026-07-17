@@ -121,6 +121,40 @@ def calculate_80ccd_1b_deduction(nps_invested_amount: float) -> float:
     return round(min(nps_invested_amount, LIMIT), 2)
 
 
+# Standard deduction differs by regime (Budget 2024 revision).
+STANDARD_DEDUCTION_OLD_REGIME = 50000
+STANDARD_DEDUCTION_NEW_REGIME = 75000
+
+
+def compute_taxable_income(
+    gross_salary: float,
+    standard_deduction: float,
+    professional_tax: float = 0,
+    hra_exemption: float = 0,
+    deduction_80c: float = 0,
+    deduction_80ccd_1b: float = 0,
+) -> float:
+    """
+    Combines everything we've built so far into one taxable income number.
+
+    This is a plain aggregator - it doesn't decide WHAT numbers go in
+    (that's the caller's job, e.g. passing hra_exemption=0 for New Regime
+    since HRA isn't allowed there). It just subtracts what it's given.
+
+    All default to 0 so you can call this for New Regime with just
+    gross_salary and standard_deduction, skipping the rest.
+    """
+    taxable = (
+        gross_salary
+        - standard_deduction
+        - professional_tax
+        - hra_exemption
+        - deduction_80c
+        - deduction_80ccd_1b
+    )
+    return max(0, round(taxable, 2))  # taxable income can't go negative
+
+
 # This block only runs when you execute THIS file directly
 # (e.g. `python3 tax_logic.py`). It will NOT run when this file
 # is imported by app.py or by another script.
@@ -153,3 +187,21 @@ if __name__ == "__main__":
     print("80CCD(1B) Deduction (expect capped at ₹50,000):")
     print(f"  Invested ₹50,000 -> ₹{calculate_80ccd_1b_deduction(50000):,.0f}")
     print(f"  Invested ₹80,000 -> ₹{calculate_80ccd_1b_deduction(80000):,.0f}  (over cap)")
+
+    print("Combined Taxable Income (Old Regime, annual figures from payslip):")
+    hra_exempt_annual = calculate_hra_exemption(
+        basic=1187094, hra_received=593549, rent_paid=250000, is_metro=False
+    )
+    taxable_old = compute_taxable_income(
+        gross_salary=2910444,
+        standard_deduction=STANDARD_DEDUCTION_OLD_REGIME,
+        professional_tax=2500,
+        hra_exemption=hra_exempt_annual,
+        deduction_80c=calculate_80c_deduction(150000),
+        deduction_80ccd_1b=calculate_80ccd_1b_deduction(50000),
+    )
+    print(f"  HRA exemption (annual, monthly-summed method): ₹{hra_exempt_annual:,.0f}")
+    print(f"  Taxable Income (Old Regime): ₹{taxable_old:,.0f}")
+    print(f"  NOTE: payslip's own figure is ₹23,72,400 - it differs because")
+    print(f"  the payslip also applies 80G + 80CCD(2), which we haven't built yet,")
+    print(f"  and uses the annual-aggregate HRA method, not the monthly-sum method.")

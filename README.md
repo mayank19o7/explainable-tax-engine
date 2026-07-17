@@ -13,7 +13,7 @@ amount" — full traceability from source to final number.
 - [x] HRA exemption calculator (Section 10(13A))
 - [x] 80C deduction (capped)
 - [x] 80CCD(1B) NPS deduction (capped)
-- [ ] Combined taxable income flow (salary → exemptions → deductions → tax)
+- [x] Combined taxable income flow (salary → exemptions → deductions → tax)
 - [ ] 80D, 80G, 80CCD(2)
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine

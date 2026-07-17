@@ -1,16 +1,16 @@
 """
-Explainable Tax Engine - Step 1
+Explainable Tax Engine - Step 2
 --------------------------------
-Goal: enter a salary, see the tax under the New Regime slabs.
+UI layer only. Actual tax math lives in tax_logic.py
 
-This is intentionally tiny. We'll grow it piece by piece.
+New this step: compare Old vs New Regime side by side.
 """
 
 import streamlit as st
-from tax_logic import calculate_new_regime_tax
+from tax_logic import calculate_new_regime_tax, calculate_old_regime_tax
 
 st.title("Explainable Tax Engine")
-st.caption("Step 1: Salary in, tax out (New Regime only)")
+st.caption("Step 2: Compare Old Regime vs New Regime")
 
 salary = st.number_input(
     "Enter your annual taxable salary (₹)",
@@ -19,6 +19,26 @@ salary = st.number_input(
     step=10000,
 )
 
-tax = calculate_new_regime_tax(salary)
+new_tax = calculate_new_regime_tax(salary)
+old_tax = calculate_old_regime_tax(salary)
 
-st.metric(label="Tax under New Regime", value=f"₹{tax:,.0f}")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("Old Regime")
+    st.metric(label="Tax", value=f"₹{old_tax:,.0f}")
+
+with col2:
+    st.subheader("New Regime")
+    st.metric(label="Tax", value=f"₹{new_tax:,.0f}")
+
+st.divider()
+
+if old_tax < new_tax:
+    saving = new_tax - old_tax
+    st.success(f"Choose Old Regime. Tax Saving = ₹{saving:,.0f}")
+elif new_tax < old_tax:
+    saving = old_tax - new_tax
+    st.success(f"Choose New Regime. Tax Saving = ₹{saving:,.0f}")
+else:
+    st.info("Both regimes result in the same tax.")

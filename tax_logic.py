@@ -133,6 +133,8 @@ def compute_taxable_income(
     hra_exemption: float = 0,
     deduction_80c: float = 0,
     deduction_80ccd_1b: float = 0,
+    deduction_80ccd_2: float = 0,
+    deduction_80g: float = 0,
 ) -> float:
     """
     Combines everything we've built so far into one taxable income number.
@@ -142,7 +144,8 @@ def compute_taxable_income(
     since HRA isn't allowed there). It just subtracts what it's given.
 
     All default to 0 so you can call this for New Regime with just
-    gross_salary and standard_deduction, skipping the rest.
+    gross_salary, standard_deduction, and deduction_80ccd_2 (the one
+    deduction New Regime does allow).
     """
     taxable = (
         gross_salary
@@ -151,8 +154,40 @@ def compute_taxable_income(
         - hra_exemption
         - deduction_80c
         - deduction_80ccd_1b
+        - deduction_80ccd_2
+        - deduction_80g
     )
     return max(0, round(taxable, 2))  # taxable income can't go negative
+
+
+def calculate_80ccd_2_deduction(
+    employer_nps_contribution: float, basic_salary: float
+) -> float:
+    """
+    Section 80CCD(2): EMPLOYER's contribution to NPS (not your own).
+    Unlike every other deduction so far, this is allowed in BOTH
+    Old and New Regime - see the plan doc's Regime Rule Engine section.
+
+    Capped at 10% of Basic Salary (private sector employees;
+    government employees get 14%, not handled here yet).
+    """
+    limit = 0.10 * basic_salary
+    return round(min(employer_nps_contribution, limit), 2)
+
+
+def calculate_80g_deduction(donation_amount: float, fully_exempt: bool = True) -> float:
+    """
+    Section 80G: donations. Old Regime only.
+
+    SIMPLIFIED for now: real 80G has multiple categories (50% or 100%
+    exempt, with or without a "qualifying limit" based on adjusted
+    gross income). We're only handling the simple 100%-exempt,
+    no-qualifying-limit case (e.g. PM CARES-style funds) for now.
+    `fully_exempt=False` gives a rough 50% category as a placeholder.
+    """
+    if fully_exempt:
+        return round(donation_amount, 2)
+    return round(donation_amount * 0.5, 2)
 
 
 # This block only runs when you execute THIS file directly
@@ -205,3 +240,26 @@ if __name__ == "__main__":
     print(f"  NOTE: payslip's own figure is ₹23,72,400 - it differs because")
     print(f"  the payslip also applies 80G + 80CCD(2), which we haven't built yet,")
     print(f"  and uses the annual-aggregate HRA method, not the monthly-sum method.")
+
+    print("Now WITH 80CCD(2) and 80G added:")
+    deduction_80ccd_2 = calculate_80ccd_2_deduction(
+        employer_nps_contribution=141928, basic_salary=1187094
+    )
+    deduction_80g = calculate_80g_deduction(donation_amount=550, fully_exempt=True)
+    taxable_old_v2 = compute_taxable_income(
+        gross_salary=2910444,
+        standard_deduction=STANDARD_DEDUCTION_OLD_REGIME,
+        professional_tax=2500,
+        hra_exemption=hra_exempt_annual,
+        deduction_80c=calculate_80c_deduction(150000),
+        deduction_80ccd_1b=calculate_80ccd_1b_deduction(50000),
+        deduction_80ccd_2=deduction_80ccd_2,
+        deduction_80g=deduction_80g,
+    )
+    print(f"  80CCD(2) deduction (capped at 10% of Basic): ₹{deduction_80ccd_2:,.0f}")
+    print(f"    (payslip's own figure is ₹1,41,928 - higher than our 10% cap;")
+    print(f"    likely computed on a different base, e.g. Basic+DA, or a")
+    print(f"    different cap %. Good target for the reconciliation engine.)")
+    print(f"  80G deduction: ₹{deduction_80g:,.0f}")
+    print(f"  Taxable Income (Old Regime, v2): ₹{taxable_old_v2:,.0f}")
+    print(f"  Remaining gap vs payslip's ₹23,72,400: ₹{taxable_old_v2 - 2372400:,.0f}")

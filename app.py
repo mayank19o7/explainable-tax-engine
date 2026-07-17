@@ -15,6 +15,8 @@ from tax_logic import (
     calculate_hra_exemption,
     calculate_80c_deduction,
     calculate_80ccd_1b_deduction,
+    calculate_80ccd_2_deduction,
+    calculate_80g_deduction,
     compute_taxable_income,
     STANDARD_DEDUCTION_OLD_REGIME,
     STANDARD_DEDUCTION_NEW_REGIME,
@@ -141,16 +143,21 @@ with tab4:
         "different things."
     )
 
-    st.subheader("Your Inputs (annual figures)")
+    st.subheader("Gross Salary")
+    st.caption("Total salary before any exemptions/deductions. No limit.")
     gross_salary = st.number_input(
         "Gross Salary (₹, annual)", min_value=0, value=2910444, key="full_gross"
     )
+
+    st.subheader("Professional Tax")
+    st.caption("State-level tax on your payslip, Old Regime only. Limit: ~₹2,500/year (varies by state).")
     professional_tax = st.number_input(
-        "Professional Tax paid (₹, annual, Old Regime only)",
+        "Professional Tax paid (₹, annual)",
         min_value=0, value=2500, key="full_pt",
     )
 
     st.write("**HRA inputs (Old Regime only)**")
+    st.caption("Rent exemption under Sec 10(13A). Limit: least of HRA received, rent − 10% of Basic, or 40%/50% of Basic.")
     fc1, fc2 = st.columns(2)
     with fc1:
         full_basic = st.number_input("Basic Salary (₹, annual)", min_value=0, value=1187094, key="full_basic")
@@ -160,11 +167,37 @@ with tab4:
         full_is_metro = st.checkbox("Metro city", value=False, key="full_metro")
 
     st.write("**Investment inputs (Old Regime only)**")
+    st.caption("80C: PF/LIC/ELSS/tuition, capped ₹1,50,000. 80CCD(1B): extra NPS, capped ₹50,000.")
     fc3, fc4 = st.columns(2)
     with fc3:
         full_80c = st.number_input("80C investments (₹, annual)", min_value=0, value=150000, key="full_80c")
     with fc4:
         full_nps = st.number_input("80CCD(1B) NPS (₹, annual)", min_value=0, value=50000, key="full_nps")
+
+    st.write("**80CCD(2) - Employer NPS (allowed in BOTH regimes)**")
+    st.caption("Employer's own NPS contribution. Limit: 10% of Basic Salary (private sector).")
+    suggested_employer_nps = round(0.10 * full_basic, 2)
+    auto_calc_nps = st.checkbox(
+        "Auto-calculate as 10% of Basic Salary (recommended)",
+        value=True,
+        key="full_nps_auto",
+    )
+    if auto_calc_nps:
+        full_employer_nps = suggested_employer_nps
+        st.info(f"Auto-set to 10% of Basic (₹{full_basic:,.0f}) = ₹{full_employer_nps:,.0f}")
+    else:
+        full_employer_nps = st.number_input(
+            "Employer's NPS contribution (₹, annual)",
+            min_value=0,
+            value=int(suggested_employer_nps),
+            key="full_employer_nps_manual",
+        )
+
+    st.write("**80G - Donations (Old Regime only, simplified to 100% category)**")
+    st.caption("Donations to eligible charities. Limit: no cap in this simplified 100%-deductible category.")
+    full_donation = st.number_input(
+        "Donation amount (₹, annual)", min_value=0, value=550, key="full_donation"
+    )
 
     # --- Old Regime: everything applies ---
     hra_exemption = calculate_hra_exemption(
@@ -172,6 +205,8 @@ with tab4:
     )
     deduction_80c = calculate_80c_deduction(full_80c)
     deduction_80ccd_1b = calculate_80ccd_1b_deduction(full_nps)
+    deduction_80ccd_2 = calculate_80ccd_2_deduction(full_employer_nps, full_basic)
+    deduction_80g = calculate_80g_deduction(full_donation, fully_exempt=True)
 
     taxable_income_old = compute_taxable_income(
         gross_salary=gross_salary,
@@ -180,13 +215,16 @@ with tab4:
         hra_exemption=hra_exemption,
         deduction_80c=deduction_80c,
         deduction_80ccd_1b=deduction_80ccd_1b,
+        deduction_80ccd_2=deduction_80ccd_2,
+        deduction_80g=deduction_80g,
     )
     tax_old = calculate_old_regime_tax(taxable_income_old)
 
-    # --- New Regime: none of HRA/80C/80CCD(1B)/PT apply ---
+    # --- New Regime: only 80CCD(2) applies, nothing else ---
     taxable_income_new = compute_taxable_income(
         gross_salary=gross_salary,
         standard_deduction=STANDARD_DEDUCTION_NEW_REGIME,
+        deduction_80ccd_2=deduction_80ccd_2,
     )
     tax_new = calculate_new_regime_tax(taxable_income_new)
 
@@ -201,12 +239,15 @@ with tab4:
         st.write(f"HRA Exemption: ₹{hra_exemption:,.0f}")
         st.write(f"80C Deduction: ₹{deduction_80c:,.0f}")
         st.write(f"80CCD(1B) Deduction: ₹{deduction_80ccd_1b:,.0f}")
+        st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}")
+        st.write(f"80G Deduction: ₹{deduction_80g:,.0f}")
         st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
         st.metric("Tax", f"₹{tax_old:,.0f}")
     with rc2:
         st.markdown("**New Regime**")
         st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_NEW_REGIME:,.0f}")
-        st.write("HRA / 80C / 80CCD(1B) / PT: not allowed")
+        st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2:,.0f}  (only deduction New Regime allows)")
+        st.write("HRA / 80C / 80CCD(1B) / PT / 80G: not allowed")
         st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
         st.metric("Tax", f"₹{tax_new:,.0f}")
 
@@ -219,6 +260,8 @@ with tab4:
         st.info("Both regimes result in the same tax.")
 
     st.caption(
-        "Note: this doesn't yet include 80D, 80G, or 80CCD(2) (employer NPS), "
-        "so totals will differ slightly from a real Form16 until those are added."
+        "Note: 80CCD(2) here is capped at 10% of Basic. Some employers "
+        "cap it against a different base (e.g. Basic+DA), which can "
+        "cause a small gap vs your actual Form16 - a good example of "
+        "why a Reconciliation Engine matters."
     )

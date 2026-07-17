@@ -9,7 +9,7 @@ amount" — full traceability from source to final number.
 🚧 Learning project, in progress. Currently built:
 
 - [x] New Regime slab calculator
-- [ ] Old Regime slab calculator
+- [x] Old Regime slab calculator + side-by-side comparison
 - [ ] HRA exemption calculator (Section 10(13A))
 - [ ] 80C deduction (capped)
 - [ ] 80CCD(1B) NPS deduction (capped)

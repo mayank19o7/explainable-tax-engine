@@ -1,2 +1,63 @@
-# explainable-tax-engine
-Explainable Indian income tax calculator — traces every number back to its source and formula, not just the total.
+# Explainable Tax Engine
+
+A Python-based tax computation, reconciliation, and explainability
+platform. Goal: not just "how much tax," but "why is my tax this
+amount" — full traceability from source to final number.
+
+## Status
+
+🚧 Learning project, in progress. Currently built:
+
+- [x] New Regime slab calculator
+- [ ] Old Regime slab calculator
+- [ ] HRA exemption calculator (Section 10(13A))
+- [ ] 80C deduction (capped)
+- [ ] 80CCD(1B) NPS deduction (capped)
+- [ ] Combined taxable income flow (salary → exemptions → deductions → tax)
+- [ ] 80D, 80G, 80CCD(2)
+- [ ] Form16 / AIS / ITR import
+- [ ] Reconciliation engine
+- [ ] Explainability report (PDF export)
+
+See `PLAN.md` for the full original design doc and roadmap.
+
+## Setup
+
+```bash
+python3 -m venv venv
+source venv/bin/activate   # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## Run
+
+```bash
+streamlit run app.py
+```
+
+## Run logic without the UI
+
+```bash
+python3 tax_logic.py
+```
+
+## Project structure
+
+```
+explainable-tax-engine/
+├── app.py            # Streamlit UI - imports functions from tax_logic.py
+├── tax_logic.py       # Pure tax calculation logic, no UI code
+├── requirements.txt
+├── .gitignore
+├── README.md
+├── PLAN.md            # Original design/vision doc
+└── data/
+    └── sample/        # Fake/redacted example data only - never real documents
+```
+
+## A note on data privacy
+
+This repo intentionally never contains real payslips, Form16, AIS, or
+ITR files. `.gitignore` blocks common tax-document file types by
+default. If you want sample data for testing, create fake or redacted
+numbers under `data/sample/`.

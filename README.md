@@ -10,7 +10,7 @@ amount" — full traceability from source to final number.
 
 - [x] New Regime slab calculator
 - [x] Old Regime slab calculator + side-by-side comparison
-- [ ] HRA exemption calculator (Section 10(13A))
+- [x] HRA exemption calculator (Section 10(13A))
 - [ ] 80C deduction (capped)
 - [ ] 80CCD(1B) NPS deduction (capped)
 - [ ] Combined taxable income flow (salary → exemptions → deductions → tax)

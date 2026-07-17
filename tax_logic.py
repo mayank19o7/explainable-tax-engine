@@ -73,6 +73,36 @@ def calculate_old_regime_tax(taxable_income: float) -> float:
 # This block only runs when you execute THIS file directly
 # (e.g. `python3 tax_logic.py`). It will NOT run when this file
 # is imported by app.py or by another script.
+def calculate_hra_exemption(
+    basic: float,
+    hra_received: float,
+    rent_paid: float,
+    is_metro: bool,
+) -> float:
+    """
+    Calculates HRA exemption under Section 10(13A) - Old Regime only.
+    (New Regime doesn't allow HRA exemption at all.)
+
+    Exemption = LEAST of:
+      1. Actual HRA received
+      2. Rent paid minus 10% of basic salary
+      3. 50% of basic (metro cities) or 40% of basic (non-metro)
+
+    'is_metro' is a bool (True/False) - a simple on/off switch.
+    Metro cities for this rule: Delhi, Mumbai, Kolkata, Chennai.
+    """
+
+    option_1 = hra_received
+    option_2 = max(0, rent_paid - (0.10 * basic))  # can't go negative
+    option_3 = basic * (0.50 if is_metro else 0.40)
+
+    exemption = min(option_1, option_2, option_3)
+    return round(exemption, 2)
+
+
+# This block only runs when you execute THIS file directly
+# (e.g. `python3 tax_logic.py`). It will NOT run when this file
+# is imported by app.py or by another script.
 if __name__ == "__main__":
     test_salaries = [250000, 700000, 1000000, 1600000, 2804760]
     print("New Regime:")
@@ -84,3 +114,12 @@ if __name__ == "__main__":
     for salary in [2372400]:  # known figure from payslip: expect ₹5,24,220
         tax = calculate_old_regime_tax(salary)
         print(f"  Salary: ₹{salary:,} -> Tax: ₹{tax:,.0f}")
+
+    print("HRA Exemption (Jun-2024 from payslip, expect ₹13,390):")
+    exemption = calculate_hra_exemption(
+        basic=116097,
+        hra_received=58049,
+        rent_paid=25000,
+        is_metro=False,  # Pune is non-metro for this rule
+    )
+    print(f"  Exemption: ₹{exemption:,.0f}")

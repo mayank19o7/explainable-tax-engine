@@ -17,7 +17,8 @@ LIMIT_80CCD_1B = 50000
 LIMIT_80D_NORMAL = 25000
 LIMIT_80D_SENIOR_CITIZEN = 50000
 
-EMPLOYER_NPS_RATE = 0.10  # 80CCD(2) cap: 10% of Basic (private sector)
+EMPLOYER_NPS_RATE_PRIVATE = 0.10  # 80CCD(2) cap: 10% of Basic (private-sector employer)
+EMPLOYER_NPS_RATE_GOVT = 0.14  # 80CCD(2) cap: 14% of Basic (Central/State Govt employer)
 
 HRA_RENT_THRESHOLD_RATE = 0.10  # rent paid minus 10% of Basic
 HRA_METRO_RATE = 0.50
@@ -172,17 +173,29 @@ def compute_taxable_income(
 
 
 def calculate_80ccd_2_deduction(
-    employer_nps_contribution: float, basic_salary: float
+    employer_nps_contribution: float,
+    basic_salary: float,
+    is_government_employee: bool = False,
+    is_new_regime: bool = False,
 ) -> float:
     """
     Section 80CCD(2): EMPLOYER's contribution to NPS (not your own).
     Unlike every other deduction so far, this is allowed in BOTH
     Old and New Regime - see the plan doc's Regime Rule Engine section.
 
-    Capped at 10% of Basic Salary (private sector employees;
-    government employees get 14%, not handled here yet).
+    Capped at the LOWER of the actual employer contribution or a
+    percentage of Basic Salary:
+    - Old Regime: 14% for Central/State Government employers,
+      10% for every other (private-sector) employer.
+    - New Regime: 14% for EVERYONE, government or private
+      (this is the one case where the New Regime cap is more
+      generous than the Old Regime cap for private-sector employees).
     """
-    limit = EMPLOYER_NPS_RATE * basic_salary
+    if is_new_regime or is_government_employee:
+        rate = EMPLOYER_NPS_RATE_GOVT
+    else:
+        rate = EMPLOYER_NPS_RATE_PRIVATE
+    limit = rate * basic_salary
     return round(min(employer_nps_contribution, limit), 2)
 
 

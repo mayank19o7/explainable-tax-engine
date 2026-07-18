@@ -605,23 +605,20 @@ once implemented (and checked off in `README.md`).
 
 ### Priority order
 
-1.  **Senior Citizen (60+) / Super Senior Citizen (80+) slabs** — app
-    only has one age-agnostic slab table per regime; real slab sheets
-    have 3 separate tables.
-2.  **Surcharge** for income above ₹50L / ₹1Cr / ₹2Cr / ₹5Cr.
-3.  **80TTA / 80TTB** — savings/FD interest deduction (₹10,000
+1.  **Surcharge** for income above ₹50L / ₹1Cr / ₹2Cr / ₹5Cr.
+2.  **80TTA / 80TTB** — savings/FD interest deduction (₹10,000
     non-seniors, ₹50,000 seniors).
-4.  **House Property income** — Section 24(b) home loan interest
+3.  **House Property income** — Section 24(b) home loan interest
     exemption, self-occupied vs. let-out, loss from house property.
-5.  **Income from Other Sources** — Savings/FD/NSC/Post Office
+4.  **Income from Other Sources** — Savings/FD/NSC/Post Office
     interest, family pension (with Sec 57(iia) standard deduction).
-6.  **80E, 80GG, 80U, 80DD, 80DDB, broader 80G/80GGA/80GGC
+5.  **80E, 80GG, 80U, 80DD, 80DDB, broader 80G/80GGA/80GGC
     categories** — all present in the real documents, none built.
-7.  **Capital Gains module** — the real filed ITR-2 has a Capital
+6.  **Capital Gains module** — the real filed ITR-2 has a Capital
     Gains schedule (incl. 112A LTCG, VDA/crypto); biggest single
     missing income module, already scoped under [Income Modules](#income-modules)
     above.
-8.  **Rebate u/s 89(1)** (Form 10E, arrears relief).
+7.  **Rebate u/s 89(1)** (Form 10E, arrears relief).
 
 ### Already resolved from this review
 
@@ -629,6 +626,10 @@ once implemented (and checked off in `README.md`).
 -   **Rebate u/s 87A** — up to ₹12,500 (Old Regime, taxable income
     ≤ ₹5L) / ₹25,000 (New Regime, taxable income ≤ ₹7L), including
     marginal relief just above the threshold.
+-   **Senior Citizen (60-79) / Super Senior Citizen (80+) Old Regime
+    slabs** — basic exemption limit now varies by age (₹2,50,000 /
+    ₹3,00,000 / ₹5,00,000); New Regime slabs stay the same for every
+    age, as per law.
 -   80CCD(2) employer NPS rate corrected: Old Regime is 14%
     (Govt employer) / 10% (private employer); New Regime is 14% for
     everyone regardless of employer type.

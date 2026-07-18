@@ -85,9 +85,9 @@ def calculate_cess(tax_amount: float, rate: float = HEALTH_EDUCATION_CESS_RATE) 
     computed tax (not on your income - on the TAX itself).
     Same rate applies to both Old and New Regime.
 
-    Applied AFTER any rebate (e.g. Section 87A) - we haven't built
-    rebate yet, so for now this runs directly on slab tax. Once
-    rebate is added, this should run on (tax - rebate) instead.
+    Applied AFTER any rebate (e.g. Section 87A) and any surcharge - so
+    the 4% is computed on (tax - rebate + surcharge), not on the raw
+    slab tax alone.
     """
     return round(tax_amount * rate, 2)
 
@@ -160,6 +160,87 @@ def calculate_87a_rebate(taxable_income: float, tax: float, is_new_regime: bool)
     if tax > excess_income:
         return round(tax - excess_income, 2)
     return 0.0
+
+
+# Surcharge: an extra percentage ON TOP OF the income tax itself (not
+# on income) for high earners. Applies above ₹50L taxable income, in
+# increasing steps. New Regime dropped the top 37% slab (Budget 2023),
+# capping New Regime surcharge at 25% regardless of how high income
+# goes; Old Regime still has the 37% top slab beyond ₹5Cr.
+# Each entry is (income threshold crossed, surcharge rate that then
+# applies to the WHOLE tax amount - not just the portion above the
+# threshold), in ascending order.
+SURCHARGE_BRACKETS_OLD_REGIME = [
+    (5000000, 0.10),
+    (10000000, 0.15),
+    (20000000, 0.25),
+    (50000000, 0.37),
+]
+
+SURCHARGE_BRACKETS_NEW_REGIME = [
+    (5000000, 0.10),
+    (10000000, 0.15),
+    (20000000, 0.25),
+]
+
+
+def calculate_surcharge(
+    taxable_income: float,
+    tax_before_surcharge: float,
+    is_new_regime: bool,
+    tax_calculator,
+) -> float:
+    """
+    Surcharge on high incomes: taxable income > ₹50L pays an extra %
+    of the income tax itself (not of income). The rate is a single
+    flat % applied to the ENTIRE tax amount based on which bracket the
+    taxable income falls in - it isn't a portion-by-portion slab like
+    income tax itself.
+
+    `tax_calculator` is the regime's own slab-tax function (e.g.
+    calculate_new_regime_tax, or a partial of calculate_old_regime_tax
+    bound to the taxpayer's age_category) - needed here to work out
+    "tax at exactly the threshold" for marginal relief below.
+
+    Marginal relief: without it, crossing a threshold by even ₹1 would
+    add tens of thousands of rupees of surcharge in one jump (a hard
+    cliff, just like Section 87A's cliff). The law prevents this: the
+    combined (tax + surcharge) can never exceed (tax + surcharge at
+    the threshold, using the bracket BELOW) plus the extra income
+    above the threshold - so crossing by ₹1 costs at most ₹1 more.
+    """
+    brackets = SURCHARGE_BRACKETS_NEW_REGIME if is_new_regime else SURCHARGE_BRACKETS_OLD_REGIME
+
+    applicable_rate = 0.0
+    applicable_threshold = None
+    previous_rate = 0.0
+    for threshold, rate in brackets:
+        if taxable_income > threshold:
+            previous_rate = applicable_rate
+            applicable_rate = rate
+            applicable_threshold = threshold
+        else:
+            break
+
+    if applicable_threshold is None:
+        return 0.0  # at or below ₹50L - no surcharge at all
+
+    surcharge = round(tax_before_surcharge * applicable_rate, 2)
+    total_with_surcharge = tax_before_surcharge + surcharge
+
+    # Marginal relief: cap total (tax + surcharge) at what it would
+    # have been at the threshold (using the bracket BELOW - i.e. the
+    # rate that applied just before crossing) plus the excess income.
+    tax_at_threshold = tax_calculator(applicable_threshold)
+    max_total_with_surcharge = (
+        tax_at_threshold * (1 + previous_rate) + (taxable_income - applicable_threshold)
+    )
+
+    if total_with_surcharge > max_total_with_surcharge:
+        relieved_surcharge = max_total_with_surcharge - tax_before_surcharge
+        return round(max(relieved_surcharge, 0.0), 2)
+
+    return surcharge
 
 
 def calculate_slab_tax(taxable_income: float, slabs: list) -> float:
@@ -484,3 +565,17 @@ if __name__ == "__main__":
     ]:
         tax_age = calculate_old_regime_tax(income_age_test, age_category=category)
         print(f"  {label}, ₹{income_age_test:,} taxable: tax=₹{tax_age:,.0f}")
+
+    print("Surcharge (expect surcharge to kick in above ₹50L, capped at 25% for New Regime beyond ₹2Cr):")
+    for income_sur, label in [(4900000, "Just below ₹50L"), (5100000, "Just above ₹50L"),
+                               (10100000, "Just above ₹1Cr"), (30000000, "₹3Cr (Old: 25%, New: 25%)"),
+                               (60000000, "₹6Cr (Old: 37% top slab, New: still capped 25%)")]:
+        tax_new_sur = calculate_new_regime_tax(income_sur)
+        surcharge_new = calculate_surcharge(income_sur, tax_new_sur, is_new_regime=True,
+                                             tax_calculator=calculate_new_regime_tax)
+        tax_old_sur = calculate_old_regime_tax(income_sur)
+        surcharge_old = calculate_surcharge(income_sur, tax_old_sur, is_new_regime=False,
+                                             tax_calculator=calculate_old_regime_tax)
+        print(f"  {label} (₹{income_sur:,}): "
+              f"New Regime tax=₹{tax_new_sur:,.0f}+surcharge=₹{surcharge_new:,.0f}, "
+              f"Old Regime tax=₹{tax_old_sur:,.0f}+surcharge=₹{surcharge_old:,.0f}")

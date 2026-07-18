@@ -62,6 +62,31 @@ def calculate_cess(tax_amount: float, rate: float = HEALTH_EDUCATION_CESS_RATE) 
     return round(tax_amount * rate, 2)
 
 
+def round_to_nearest_10(amount: float) -> float:
+    """
+    Sections 288A and 288B of the Income Tax Act: taxable income must 
+    both be rounded to the nearest ₹10 (not just the nearest rupee, 
+    which is all we've done so far).
+
+    Two steps, matching the law exactly:
+      1. Ignore paise - round to the nearest whole rupee first.
+         (This also fixes floating-point noise from earlier float
+         subtraction, e.g. 2372394.9999996 instead of a clean
+         2372395.0 - without this step, checking the tens digit
+         on the noisy value gives the WRONG answer.)
+      2. Round that whole-rupee amount to the nearest 10, using
+         "round half up" - if the last digit is 5 or more, round UP;
+         otherwise round DOWN. Python's built-in round() won't do
+         this correctly for .5 cases (it uses "banker's rounding"),
+         so we compute it manually.
+    """
+    whole_rupees = round(amount)  # step 1: ignore paise, fix float noise
+    remainder = whole_rupees % 10  # step 2: round to nearest 10
+    if remainder >= 5:
+        return float(whole_rupees - remainder + 10)
+    return float(whole_rupees - remainder)
+
+
 def calculate_slab_tax(taxable_income: float, slabs: list) -> float:
     """
     Generic progressive slab-tax calculator: walks through `slabs`
@@ -179,7 +204,8 @@ def compute_taxable_income(
         - deduction_80g
         - deduction_80d
     )
-    return max(0, round(taxable, 2))  # taxable income can't go negative
+    taxable = max(0, taxable)  # taxable income can't go negative
+    return round_to_nearest_10(round(taxable, 2))  # Section 288A rounding
 
 
 def calculate_80ccd_2_deduction(
@@ -337,3 +363,7 @@ if __name__ == "__main__":
     cess = calculate_cess(524220)
     print(f"  Cess: ₹{cess:,.0f}")
     print(f"  Net Tax (Tax + Cess): ₹{524220 + cess:,.0f}  (payslip: ₹5,45,189)")
+
+    print("Section 288A Rounding (round taxable income to nearest ₹10):")
+    for amount in [2372394, 2372395, 2372396]:
+        print(f"  ₹{amount:,} -> ₹{round_to_nearest_10(amount):,}")

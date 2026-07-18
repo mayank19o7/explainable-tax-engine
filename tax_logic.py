@@ -87,6 +87,41 @@ def round_to_nearest_10(amount: float) -> float:
     return float(whole_rupees - remainder)
 
 
+# Section 87A rebate: below a taxable income threshold, you get a
+# rebate that can zero out your tax entirely. Thresholds and rebate
+# caps differ by regime.
+REBATE_87A_INCOME_LIMIT_OLD_REGIME = 500000
+REBATE_87A_MAX_AMOUNT_OLD_REGIME = 12500
+
+REBATE_87A_INCOME_LIMIT_NEW_REGIME = 700000
+REBATE_87A_MAX_AMOUNT_NEW_REGIME = 25000
+
+
+def calculate_87a_rebate(taxable_income: float, tax: float, is_new_regime: bool) -> float:
+    """
+    Section 87A rebate: if taxable income is at or below the regime's
+    threshold, you get a rebate - capped at the regime's max amount,
+    but never more than the tax you actually owe (so it can only
+    bring your tax down to zero, never negative).
+
+    KNOWN LIMITATION: real law also has "marginal relief" just above
+    the threshold, so tax doesn't jump sharply the moment you cross
+    it by even ₹1. We're not modeling that yet - right now there's
+    a hard cliff at the threshold, which is a simplification worth
+    fixing later.
+    """
+    if is_new_regime:
+        income_limit = REBATE_87A_INCOME_LIMIT_NEW_REGIME
+        max_rebate = REBATE_87A_MAX_AMOUNT_NEW_REGIME
+    else:
+        income_limit = REBATE_87A_INCOME_LIMIT_OLD_REGIME
+        max_rebate = REBATE_87A_MAX_AMOUNT_OLD_REGIME
+
+    if taxable_income <= income_limit:
+        return round(min(tax, max_rebate), 2)
+    return 0.0
+
+
 def calculate_slab_tax(taxable_income: float, slabs: list) -> float:
     """
     Generic progressive slab-tax calculator: walks through `slabs`
@@ -367,3 +402,16 @@ if __name__ == "__main__":
     print("Section 288A Rounding (round taxable income to nearest ₹10):")
     for amount in [2372394, 2372395, 2372396]:
         print(f"  ₹{amount:,} -> ₹{round_to_nearest_10(amount):,}")
+
+    print("Section 87A Rebate (expect zero tax at the threshold):")
+    income_new = 700000
+    tax_new_87a = calculate_new_regime_tax(income_new)
+    rebate_new = calculate_87a_rebate(income_new, tax_new_87a, is_new_regime=True)
+    print(f"  New Regime, ₹{income_new:,} taxable: tax=₹{tax_new_87a:,.0f}, "
+          f"rebate=₹{rebate_new:,.0f}, net=₹{tax_new_87a - rebate_new:,.0f}")
+
+    income_old = 500000
+    tax_old_87a = calculate_old_regime_tax(income_old)
+    rebate_old = calculate_87a_rebate(income_old, tax_old_87a, is_new_regime=False)
+    print(f"  Old Regime, ₹{income_old:,} taxable: tax=₹{tax_old_87a:,.0f}, "
+          f"rebate=₹{rebate_old:,.0f}, net=₹{tax_old_87a - rebate_old:,.0f}")

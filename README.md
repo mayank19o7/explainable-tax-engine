@@ -23,6 +23,8 @@ amount" — full traceability from source to final number.
 - [x] Section 87A marginal relief (just above the threshold)
 - [x] Senior Citizen (60-79) / Super Senior Citizen (80+) Old Regime slabs
 - [x] Surcharge for high incomes (>₹50L, with marginal relief; Old Regime 10/15/25/37%, New Regime capped at 25%)
+- [x] Income from Other Sources - Savings Bank interest, Deposit (FD/PO/NSC) interest, Dividend, Others - all taxed in both regimes
+- [x] 80TTA/80TTB deduction on Savings Bank + Deposit interest only (₹10,000 non-senior savings-only / ₹50,000 senior both-interest, Old Regime only)
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

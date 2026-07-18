@@ -605,19 +605,24 @@ once implemented (and checked off in `README.md`).
 
 ### Priority order
 
-1.  **80TTA / 80TTB** — savings/FD interest deduction (₹10,000
-    non-seniors, ₹50,000 seniors).
-2.  **House Property income** — Section 24(b) home loan interest
+1.  **House Property income** — Section 24(b) home loan interest
     exemption, self-occupied vs. let-out, loss from house property.
-3.  **Income from Other Sources** — Savings/FD/NSC/Post Office
-    interest, family pension (with Sec 57(iia) standard deduction).
-4.  **80E, 80GG, 80U, 80DD, 80DDB, broader 80G/80GGA/80GGC
+2.  **80E, 80GG, 80U, 80DD, 80DDB, broader 80G/80GGA/80GGC
     categories** — all present in the real documents, none built.
-5.  **Capital Gains module** — the real filed ITR-2 has a Capital
+3.  **Capital Gains module** — the real filed ITR-2 has a Capital
     Gains schedule (incl. 112A LTCG, VDA/crypto); biggest single
     missing income module, already scoped under [Income Modules](#income-modules)
-    above.
-6.  **Rebate u/s 89(1)** (Form 10E, arrears relief).
+    above. Note: buying/selling the same securities/mutual fund units
+    that the Dividend field covers is NOT modeled yet - only the
+    dividend income itself is - so this module will need to connect
+    back to that field once built.
+4.  **Rebate u/s 89(1)** (Form 10E, arrears relief).
+5.  **Family pension standard deduction (Sec 57(iia))** — least of ⅓
+    of pension or ₹15,000; a narrow special-case deduction on top of
+    "Income from Other Sources," currently just lumped untouched into
+    the generic "Others" field there (taxed in full, no deduction
+    applied). Small/rare enough to track separately rather than block
+    closing out that section.
 
 ### Already resolved from this review
 
@@ -634,6 +639,22 @@ once implemented (and checked off in `README.md`).
     Regime caps at 25% regardless of how high income goes, per Budget
     2023). Includes marginal relief at each threshold, same mechanism
     as the 87A marginal relief above.
+-   **Income from Other Sources** - closed out: the 4 items called out
+    in the Example Problem Statement at the top of this doc (Savings
+    Interest, FD Interest, Dividend, Refund Interest) are all covered,
+    via 4 explicit inputs - Interest from Savings Bank, Interest from
+    Deposits (FD/Post Office/NSC), Dividend (shares & mutual fund
+    units - accepted as a plain taxable amount, flagged with a warning
+    that TDS thresholds and the underlying capital gains on the
+    securities themselves aren't modeled), and a catch-all Others
+    field (covers Refund Interest u/s 244A, which needs no special
+    deduction) - all taxed in both regimes. **80TTA/80TTB deduction**
+    applies only to the two interest fields (₹10,000 non-senior,
+    savings-only / ₹50,000 senior, savings+deposit combined),
+    auto-derived from the same Age Category selector used for Old
+    Regime slabs and 80D, so the user only states their age once.
+    (Family pension's own Sec 57(iia) deduction is intentionally
+    carved out as a separate, narrower backlog item above.)
 -   80CCD(2) employer NPS rate corrected: Old Regime is 14%
     (Govt employer) / 10% (private employer); New Regime is 14% for
     everyone regardless of employer type.

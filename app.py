@@ -18,6 +18,7 @@ from tax_logic import (
     calculate_80ccd_2_deduction,
     calculate_80g_deduction,
     calculate_80d_deduction,
+    calculate_80tta_ttb_deduction,
     calculate_cess,
     calculate_87a_rebate,
     calculate_surcharge,
@@ -159,6 +160,60 @@ with tab3:
         )
 
     with st.container(border=True):
+        st.subheader("🏦 Income from Other Sources")
+        st.caption(
+            "All taxable in BOTH regimes. The 80TTA/80TTB deduction below "
+            "(Old Regime only) applies ONLY to Savings Bank + Deposit "
+            "interest, computed automatically from your Age Category above: "
+            "non-seniors get 80TTA (savings interest only, capped ₹10,000); "
+            "seniors get 80TTB (ALL interest, capped ₹50,000) instead."
+        )
+        os1, os2 = st.columns(2)
+        with os1:
+            full_savings_interest = st.number_input(
+                "Interest from Savings Bank (₹, annual)", min_value=0, value=0, key="full_savings_interest"
+            )
+        with os2:
+            full_deposit_interest = st.number_input(
+                "Interest from Deposits - FD/Post Office/NSC etc. (₹, annual)", min_value=0, value=0, key="full_deposit_interest"
+            )
+
+        os3, os4 = st.columns(2)
+        with os3:
+            full_dividend_income = st.number_input(
+                "Dividend - shares & mutual fund units (₹, annual)", min_value=0, value=0, key="full_dividend_income"
+            )
+        with os4:
+            full_other_income_misc = st.number_input(
+                "Others - refund interest, family pension, etc. (₹, annual)", min_value=0, value=0, key="full_other_income_misc"
+            )
+
+        other_source_income = (
+            full_savings_interest + full_deposit_interest + full_dividend_income + full_other_income_misc
+        )
+
+        full_is_senior_for_tta_ttb = full_age_category != AGE_CATEGORY_BELOW_60
+        deduction_80tta_ttb = calculate_80tta_ttb_deduction(
+            savings_interest=full_savings_interest,
+            fd_interest=full_deposit_interest,
+            is_senior_citizen=full_is_senior_for_tta_ttb,
+        )
+        if other_source_income > 0:
+            st.metric("Total Other Source Income", f"₹{other_source_income:,.0f}")
+            section_used = "80TTB (senior)" if full_is_senior_for_tta_ttb else "80TTA (non-senior)"
+            st.metric(f"Deduction claimed - {section_used}", f"₹{deduction_80tta_ttb:,.0f}")
+            if not full_is_senior_for_tta_ttb and full_deposit_interest > 0:
+                st.caption(
+                    f"Deposit interest (₹{full_deposit_interest:,.0f}) doesn't "
+                    "qualify under 80TTA - only savings bank interest does."
+                )
+            if full_dividend_income + full_other_income_misc > 0:
+                st.caption(
+                    f"Dividend + Others (₹{full_dividend_income + full_other_income_misc:,.0f}) "
+                    "get no 80TTA/80TTB deduction - only savings/deposit interest is eligible."
+                )
+
+    with st.container(border=True):
         st.subheader("🏛️ Professional Tax")
         st.caption("State-level tax on your payslip, Old Regime only. Limit: ~₹2,500/year (varies by state).")
         professional_tax = st.number_input(
@@ -287,6 +342,7 @@ with tab3:
     taxable_income_old = compute_taxable_income(
         gross_salary=gross_salary,
         standard_deduction=STANDARD_DEDUCTION_OLD_REGIME,
+        other_source_income=other_source_income,
         professional_tax=professional_tax,
         hra_exemption=hra_exemption,
         deduction_80c=deduction_80c,
@@ -294,13 +350,16 @@ with tab3:
         deduction_80ccd_2=deduction_80ccd_2_old,
         deduction_80g=deduction_80g,
         deduction_80d=deduction_80d,
+        deduction_80tta_ttb=deduction_80tta_ttb,
     )
     tax_old = calculate_old_regime_tax(taxable_income_old, age_category=full_age_category)
 
-    # --- New Regime: only 80CCD(2) applies, nothing else ---
+    # --- New Regime: only 80CCD(2) applies, nothing else (other source
+    # income is still taxable, but 80TTA/80TTB deduction is NOT allowed) ---
     taxable_income_new = compute_taxable_income(
         gross_salary=gross_salary,
         standard_deduction=STANDARD_DEDUCTION_NEW_REGIME,
+        other_source_income=other_source_income,
         deduction_80ccd_2=deduction_80ccd_2_new,
     )
     tax_new = calculate_new_regime_tax(taxable_income_new)
@@ -381,6 +440,8 @@ with tab3:
         with rc1:
             st.markdown("**Old Regime**")
             st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_OLD_REGIME:,.0f}")
+            if other_source_income > 0:
+                st.write(f"Other Source Income: +₹{other_source_income:,.0f}")
             st.write(f"Professional Tax: ₹{professional_tax:,.0f}")
             st.write(f"HRA Exemption: ₹{hra_exemption:,.0f}")
             st.write(f"80C Deduction: ₹{deduction_80c:,.0f}")
@@ -388,6 +449,8 @@ with tab3:
             st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2_old:,.0f}")
             st.write(f"80G Deduction: ₹{deduction_80g:,.0f}")
             st.write(f"80D Deduction: ₹{deduction_80d:,.0f}")
+            if other_source_income > 0:
+                st.write(f"80TTA/80TTB Deduction: ₹{deduction_80tta_ttb:,.0f}")
             st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
             st.metric("Tax Liability", f"₹{tax_old:,.0f}")
             if rebate_old > 0:
@@ -399,8 +462,10 @@ with tab3:
         with rc2:
             st.markdown("**New Regime**")
             st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_NEW_REGIME:,.0f}")
+            if other_source_income > 0:
+                st.write(f"Other Source Income: +₹{other_source_income:,.0f}  (taxable, but no 80TTA/80TTB deduction)")
             st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2_new:,.0f}  (only deduction New Regime allows, capped at 14% for everyone)")
-            st.write("HRA / 80C / 80CCD(1B) / PT / 80G / 80D: not allowed")
+            st.write("HRA / 80C / 80CCD(1B) / PT / 80G / 80D / 80TTA/80TTB: not allowed")
             st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
             st.metric("Tax Liability", f"₹{tax_new:,.0f}")
             if rebate_new > 0:

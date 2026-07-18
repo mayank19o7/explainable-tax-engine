@@ -20,7 +20,7 @@ amount" — full traceability from source to final number.
 - [x] Health & Education Cess (4% on tax)
 - [x] Section 288A/288B rounding (nearest ₹10, taxable income)
 - [x] Section 87A rebate (New Regime up to ₹7L, Old Regime up to ₹5L - zero tax)
-- [ ] Section 87A marginal relief (just above the threshold)
+- [x] Section 87A marginal relief (just above the threshold)
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

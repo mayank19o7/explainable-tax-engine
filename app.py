@@ -19,6 +19,7 @@ from tax_logic import (
     calculate_80g_deduction,
     calculate_80d_deduction,
     calculate_cess,
+    calculate_87a_rebate,
     compute_taxable_income,
     STANDARD_DEDUCTION_OLD_REGIME,
     STANDARD_DEDUCTION_NEW_REGIME,
@@ -262,11 +263,39 @@ with tab3:
     )
     tax_new = calculate_new_regime_tax(taxable_income_new)
 
-    cess_old = calculate_cess(tax_old)
-    net_tax_old = tax_old + cess_old
+    rebate_old = calculate_87a_rebate(taxable_income_old, tax_old, is_new_regime=False)
+    tax_after_rebate_old = tax_old - rebate_old
 
-    cess_new = calculate_cess(tax_new)
-    net_tax_new = tax_new + cess_new
+    rebate_new = calculate_87a_rebate(taxable_income_new, tax_new, is_new_regime=True)
+    tax_after_rebate_new = tax_new - rebate_new
+
+    with st.container(border=True):
+        st.subheader("🎁 Section 87A Rebate")
+        st.caption(
+            "Automatic - not something you enter. New Regime: taxable income "
+            "≤ ₹7,00,000 → rebate up to ₹25,000. Old Regime: taxable income "
+            "≤ ₹5,00,000 → rebate up to ₹12,500. Can only reduce tax to ₹0, "
+            "never below."
+        )
+        rc_87a1, rc_87a2 = st.columns(2)
+        with rc_87a1:
+            st.metric("Old Regime Rebate", f"₹{rebate_old:,.0f}")
+            if rebate_old > 0:
+                st.caption(f"Applied - taxable income ₹{taxable_income_old:,.0f} is at/below ₹5,00,000.")
+            else:
+                st.caption(f"Not applied - taxable income ₹{taxable_income_old:,.0f} exceeds ₹5,00,000.")
+        with rc_87a2:
+            st.metric("New Regime Rebate", f"₹{rebate_new:,.0f}")
+            if rebate_new > 0:
+                st.caption(f"Applied - taxable income ₹{taxable_income_new:,.0f} is at/below ₹7,00,000.")
+            else:
+                st.caption(f"Not applied - taxable income ₹{taxable_income_new:,.0f} exceeds ₹7,00,000.")
+
+    cess_old = calculate_cess(tax_after_rebate_old)
+    net_tax_old = tax_after_rebate_old + cess_old
+
+    cess_new = calculate_cess(tax_after_rebate_new)
+    net_tax_new = tax_after_rebate_new + cess_new
 
     st.divider()
     st.subheader("🧾 Result")
@@ -285,6 +314,8 @@ with tab3:
             st.write(f"80D Deduction: ₹{deduction_80d:,.0f}")
             st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
             st.metric("Tax Liability", f"₹{tax_old:,.0f}")
+            if rebate_old > 0:
+                st.write(f"Section 87A Rebate: −₹{rebate_old:,.0f}")
             st.metric("Cess (4%)", f"₹{cess_old:,.0f}")
             st.metric("Net Tax", f"₹{net_tax_old:,.0f}")
         with rc2:
@@ -294,6 +325,8 @@ with tab3:
             st.write("HRA / 80C / 80CCD(1B) / PT / 80G / 80D: not allowed")
             st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
             st.metric("Tax Liability", f"₹{tax_new:,.0f}")
+            if rebate_new > 0:
+                st.write(f"Section 87A Rebate: −₹{rebate_new:,.0f}")
             st.metric("Cess (4%)", f"₹{cess_new:,.0f}")
             st.metric("Net Tax", f"₹{net_tax_new:,.0f}")
 

@@ -18,6 +18,7 @@ amount" — full traceability from source to final number.
 - [x] 80G donations (simplified, 100% category)
 - [x] 80D (health insurance, self + parents, senior citizen limits)
 - [x] Health & Education Cess (4% on tax)
+- [x] Section 288A/288B rounding (nearest ₹10, taxable income)
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

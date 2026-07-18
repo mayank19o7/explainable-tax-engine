@@ -22,6 +22,7 @@ amount" — full traceability from source to final number.
 - [x] Section 87A rebate (New Regime up to ₹7L, Old Regime up to ₹5L - zero tax)
 - [x] Section 87A marginal relief (just above the threshold)
 - [x] Senior Citizen (60-79) / Super Senior Citizen (80+) Old Regime slabs
+- [x] Surcharge for high incomes (>₹50L, with marginal relief; Old Regime 10/15/25/37%, New Regime capped at 25%)
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

@@ -20,6 +20,7 @@ from tax_logic import (
     calculate_80d_deduction,
     calculate_cess,
     calculate_87a_rebate,
+    calculate_surcharge,
     compute_taxable_income,
     STANDARD_DEDUCTION_OLD_REGIME,
     STANDARD_DEDUCTION_NEW_REGIME,
@@ -338,11 +339,39 @@ with tab3:
             else:
                 st.caption(f"Not applied - taxable income ₹{taxable_income_new:,.0f} exceeds ₹7,00,000.")
 
-    cess_old = calculate_cess(tax_after_rebate_old)
-    net_tax_old = tax_after_rebate_old + cess_old
+    surcharge_old = calculate_surcharge(
+        taxable_income_old, tax_after_rebate_old, is_new_regime=False,
+        tax_calculator=lambda income: calculate_old_regime_tax(income, age_category=full_age_category),
+    )
+    surcharge_new = calculate_surcharge(
+        taxable_income_new, tax_after_rebate_new, is_new_regime=True,
+        tax_calculator=calculate_new_regime_tax,
+    )
 
-    cess_new = calculate_cess(tax_after_rebate_new)
-    net_tax_new = tax_after_rebate_new + cess_new
+    if surcharge_old > 0 or surcharge_new > 0:
+        with st.container(border=True):
+            st.subheader("💎 Surcharge (high income)")
+            st.caption(
+                "Extra % of the tax itself (not of income), for taxable income "
+                "above ₹50,00,000: 10% above ₹50L, 15% above ₹1Cr, 25% above "
+                "₹2Cr. Old Regime also has a 37% slab above ₹5Cr - New Regime "
+                "caps at 25% no matter how high income goes. Marginal relief "
+                "applies just above each threshold, same idea as 87A above."
+            )
+            rc_sur1, rc_sur2 = st.columns(2)
+            with rc_sur1:
+                st.metric("Old Regime Surcharge", f"₹{surcharge_old:,.0f}")
+            with rc_sur2:
+                st.metric("New Regime Surcharge", f"₹{surcharge_new:,.0f}")
+
+    tax_plus_surcharge_old = tax_after_rebate_old + surcharge_old
+    tax_plus_surcharge_new = tax_after_rebate_new + surcharge_new
+
+    cess_old = calculate_cess(tax_plus_surcharge_old)
+    net_tax_old = tax_plus_surcharge_old + cess_old
+
+    cess_new = calculate_cess(tax_plus_surcharge_new)
+    net_tax_new = tax_plus_surcharge_new + cess_new
 
     st.divider()
     st.subheader("🧾 Result")
@@ -363,6 +392,8 @@ with tab3:
             st.metric("Tax Liability", f"₹{tax_old:,.0f}")
             if rebate_old > 0:
                 st.write(f"Section 87A Rebate: −₹{rebate_old:,.0f}")
+            if surcharge_old > 0:
+                st.write(f"Surcharge: +₹{surcharge_old:,.0f}")
             st.metric("Cess (4%)", f"₹{cess_old:,.0f}")
             st.metric("Net Tax", f"₹{net_tax_old:,.0f}")
         with rc2:
@@ -374,6 +405,8 @@ with tab3:
             st.metric("Tax Liability", f"₹{tax_new:,.0f}")
             if rebate_new > 0:
                 st.write(f"Section 87A Rebate: −₹{rebate_new:,.0f}")
+            if surcharge_new > 0:
+                st.write(f"Surcharge: +₹{surcharge_new:,.0f}")
             st.metric("Cess (4%)", f"₹{cess_new:,.0f}")
             st.metric("Net Tax", f"₹{net_tax_new:,.0f}")
 

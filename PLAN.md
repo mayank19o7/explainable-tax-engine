@@ -605,20 +605,19 @@ once implemented (and checked off in `README.md`).
 
 ### Priority order
 
-1.  **Surcharge** for income above ₹50L / ₹1Cr / ₹2Cr / ₹5Cr.
-2.  **80TTA / 80TTB** — savings/FD interest deduction (₹10,000
+1.  **80TTA / 80TTB** — savings/FD interest deduction (₹10,000
     non-seniors, ₹50,000 seniors).
-3.  **House Property income** — Section 24(b) home loan interest
+2.  **House Property income** — Section 24(b) home loan interest
     exemption, self-occupied vs. let-out, loss from house property.
-4.  **Income from Other Sources** — Savings/FD/NSC/Post Office
+3.  **Income from Other Sources** — Savings/FD/NSC/Post Office
     interest, family pension (with Sec 57(iia) standard deduction).
-5.  **80E, 80GG, 80U, 80DD, 80DDB, broader 80G/80GGA/80GGC
+4.  **80E, 80GG, 80U, 80DD, 80DDB, broader 80G/80GGA/80GGC
     categories** — all present in the real documents, none built.
-6.  **Capital Gains module** — the real filed ITR-2 has a Capital
+5.  **Capital Gains module** — the real filed ITR-2 has a Capital
     Gains schedule (incl. 112A LTCG, VDA/crypto); biggest single
     missing income module, already scoped under [Income Modules](#income-modules)
     above.
-7.  **Rebate u/s 89(1)** (Form 10E, arrears relief).
+6.  **Rebate u/s 89(1)** (Form 10E, arrears relief).
 
 ### Already resolved from this review
 
@@ -630,6 +629,11 @@ once implemented (and checked off in `README.md`).
     slabs** — basic exemption limit now varies by age (₹2,50,000 /
     ₹3,00,000 / ₹5,00,000); New Regime slabs stay the same for every
     age, as per law.
+-   **Surcharge** on taxable income above ₹50L — 10%/15%/25% (both
+    regimes), plus a 37% top slab above ₹5Cr for Old Regime only (New
+    Regime caps at 25% regardless of how high income goes, per Budget
+    2023). Includes marginal relief at each threshold, same mechanism
+    as the 87A marginal relief above.
 -   80CCD(2) employer NPS rate corrected: Old Regime is 14%
     (Govt employer) / 10% (private employer); New Regime is 14% for
     everyone regardless of employer type.

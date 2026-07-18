@@ -16,6 +16,8 @@ LIMIT_80C = 150000
 LIMIT_80CCD_1B = 50000
 LIMIT_80D_NORMAL = 25000
 LIMIT_80D_SENIOR_CITIZEN = 50000
+LIMIT_80TTA = 10000  # non-seniors: savings account interest only
+LIMIT_80TTB_SENIOR = 50000  # seniors: ALL interest (savings + FD + post office etc.)
 
 EMPLOYER_NPS_RATE_PRIVATE = 0.10  # 80CCD(2) cap: 10% of Basic (private-sector employer)
 EMPLOYER_NPS_RATE_GOVT = 0.14  # 80CCD(2) cap: 14% of Basic (Central/State Govt employer)
@@ -336,6 +338,7 @@ def calculate_80ccd_1b_deduction(nps_invested_amount: float) -> float:
 def compute_taxable_income(
     gross_salary: float,
     standard_deduction: float,
+    other_source_income: float = 0,
     professional_tax: float = 0,
     hra_exemption: float = 0,
     deduction_80c: float = 0,
@@ -343,20 +346,29 @@ def compute_taxable_income(
     deduction_80ccd_2: float = 0,
     deduction_80g: float = 0,
     deduction_80d: float = 0,
+    deduction_80tta_ttb: float = 0,
 ) -> float:
     """
     Combines everything we've built so far into one taxable income number.
 
     This is a plain aggregator - it doesn't decide WHAT numbers go in
     (that's the caller's job, e.g. passing hra_exemption=0 for New Regime
-    since HRA isn't allowed there). It just subtracts what it's given.
+    since HRA isn't allowed there). It just adds/subtracts what it's given.
+
+    `other_source_income` (e.g. savings/FD interest under "Income from
+    Other Sources") is ADDED to gross salary - it's taxable in BOTH
+    regimes. `deduction_80tta_ttb` is the deduction claimed against that
+    interest income - Old Regime only, so callers should pass 0 for
+    New Regime.
 
     All default to 0 so you can call this for New Regime with just
-    gross_salary, standard_deduction, and deduction_80ccd_2 (the one
-    deduction New Regime does allow).
+    gross_salary, standard_deduction, other_source_income (still
+    taxable), and deduction_80ccd_2 (the one deduction New Regime
+    does allow).
     """
     taxable = (
         gross_salary
+        + other_source_income
         - standard_deduction
         - professional_tax
         - hra_exemption
@@ -365,6 +377,7 @@ def compute_taxable_income(
         - deduction_80ccd_2
         - deduction_80g
         - deduction_80d
+        - deduction_80tta_ttb
     )
     taxable = max(0, taxable)  # taxable income can't go negative
     return round_to_nearest_10(round(taxable, 2))  # Section 288A rounding
@@ -435,6 +448,30 @@ def calculate_80g_deduction(donation_amount: float, fully_exempt: bool = True) -
     if fully_exempt:
         return round(donation_amount, 2)
     return round(donation_amount * 0.5, 2)
+
+
+def calculate_80tta_ttb_deduction(
+    savings_interest: float,
+    fd_interest: float = 0,
+    other_interest: float = 0,
+    is_senior_citizen: bool = False,
+) -> float:
+    """
+    Sections 80TTA / 80TTB: deduction on interest income from a
+    savings/FD account. Old Regime only - New Regime allows neither.
+
+    The two sections are mutually exclusive per taxpayer, based on age:
+      - 80TTA (non-seniors): ONLY savings account interest is eligible
+        (FD/post office interest is NOT), capped at ₹10,000.
+      - 80TTB (seniors, 60+): ALL interest income is eligible - savings,
+        FD, post office, etc. - capped at ₹50,000 (and since this is
+        more generous, it replaces 80TTA for seniors rather than
+        stacking with it).
+    """
+    if is_senior_citizen:
+        total_interest = savings_interest + fd_interest + other_interest
+        return round(min(total_interest, LIMIT_80TTB_SENIOR), 2)
+    return round(min(savings_interest, LIMIT_80TTA), 2)
 
 
 # This block only runs when you execute THIS file directly
@@ -579,3 +616,14 @@ if __name__ == "__main__":
         print(f"  {label} (₹{income_sur:,}): "
               f"New Regime tax=₹{tax_new_sur:,.0f}+surcharge=₹{surcharge_new:,.0f}, "
               f"Old Regime tax=₹{tax_old_sur:,.0f}+surcharge=₹{surcharge_old:,.0f}")
+
+    print("Section 80TTA/80TTB Deduction (expect non-senior capped at ₹10,000 savings-only, senior capped at ₹50,000 all-interest):")
+    non_senior_deduction = calculate_80tta_ttb_deduction(
+        savings_interest=15000, fd_interest=40000, is_senior_citizen=False
+    )
+    print(f"  Non-senior, savings=₹15,000 + FD=₹40,000 -> Deduction (80TTA, savings-only): ₹{non_senior_deduction:,.0f}")
+
+    senior_deduction = calculate_80tta_ttb_deduction(
+        savings_interest=15000, fd_interest=40000, is_senior_citizen=True
+    )
+    print(f"  Senior, savings=₹15,000 + FD=₹40,000 -> Deduction (80TTB, capped ₹50,000): ₹{senior_deduction:,.0f}")

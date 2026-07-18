@@ -21,6 +21,7 @@ amount" — full traceability from source to final number.
 - [x] Section 288A/288B rounding (nearest ₹10, taxable income)
 - [x] Section 87A rebate (New Regime up to ₹7L, Old Regime up to ₹5L - zero tax)
 - [x] Section 87A marginal relief (just above the threshold)
+- [x] Senior Citizen (60-79) / Super Senior Citizen (80+) Old Regime slabs
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

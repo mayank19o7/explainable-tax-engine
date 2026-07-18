@@ -31,6 +31,9 @@ from tax_logic import (
     EMPLOYER_NPS_RATE_GOVT,
     REBATE_87A_INCOME_LIMIT_OLD_REGIME,
     REBATE_87A_INCOME_LIMIT_NEW_REGIME,
+    AGE_CATEGORY_BELOW_60,
+    AGE_CATEGORY_SENIOR,
+    AGE_CATEGORY_SUPER_SENIOR,
 )
 
 st.title("Explainable Tax Engine")
@@ -53,8 +56,21 @@ with tab1:
         key="salary_input",
     )
 
+    age_label_to_category = {
+        "Below 60": AGE_CATEGORY_BELOW_60,
+        "Senior Citizen (60-79)": AGE_CATEGORY_SENIOR,
+        "Super Senior Citizen (80+)": AGE_CATEGORY_SUPER_SENIOR,
+    }
+    age_label = st.selectbox(
+        "Your age category (affects Old Regime basic exemption limit only - "
+        "New Regime slabs are the same for every age)",
+        list(age_label_to_category.keys()),
+        key="regime_cmp_age",
+    )
+    age_category = age_label_to_category[age_label]
+
     new_tax = calculate_new_regime_tax(salary)
-    old_tax = calculate_old_regime_tax(salary)
+    old_tax = calculate_old_regime_tax(salary, age_category=age_category)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -115,6 +131,24 @@ with tab3:
         "→ tax, computed separately per regime, since each regime allows "
         "different things."
     )
+
+    with st.container(border=True):
+        st.subheader("🎂 Age Category")
+        st.caption(
+            "Affects the Old Regime basic exemption limit (₹2,50,000 below "
+            "60 / ₹3,00,000 senior / ₹5,00,000 super senior) and doubles as "
+            "your own 80D senior-citizen status. New Regime slabs are the "
+            "same for every age."
+        )
+        full_age_label_to_category = {
+            "Below 60": AGE_CATEGORY_BELOW_60,
+            "Senior Citizen (60-79)": AGE_CATEGORY_SENIOR,
+            "Super Senior Citizen (80+)": AGE_CATEGORY_SUPER_SENIOR,
+        }
+        full_age_label = st.selectbox(
+            "Your age category", list(full_age_label_to_category.keys()), key="full_age"
+        )
+        full_age_category = full_age_label_to_category[full_age_label]
 
     with st.container(border=True):
         st.subheader("💰 Gross Salary")
@@ -208,7 +242,12 @@ with tab3:
             full_premium_self = st.number_input(
                 "Self + family premium (₹, annual)", min_value=0, value=0, key="full_premium_self"
             )
-            full_self_senior = st.checkbox("I am a senior citizen (60+)", value=False, key="full_self_senior")
+            full_self_senior = full_age_category != AGE_CATEGORY_BELOW_60
+            st.caption(
+                "Senior citizen limit applies (from Age Category above)."
+                if full_self_senior else
+                "Non-senior limit applies (from Age Category above)."
+            )
             limit_self = LIMIT_80D_SENIOR_CITIZEN if full_self_senior else LIMIT_80D_NORMAL
             if full_premium_self > limit_self:
                 st.caption(
@@ -255,7 +294,7 @@ with tab3:
         deduction_80g=deduction_80g,
         deduction_80d=deduction_80d,
     )
-    tax_old = calculate_old_regime_tax(taxable_income_old)
+    tax_old = calculate_old_regime_tax(taxable_income_old, age_category=full_age_category)
 
     # --- New Regime: only 80CCD(2) applies, nothing else ---
     taxable_income_new = compute_taxable_income(

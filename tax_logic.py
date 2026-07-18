@@ -38,12 +38,42 @@ NEW_REGIME_SLABS = [
     (float("inf"), 0.30),
 ]
 
-OLD_REGIME_SLABS = [
+# Old Regime slabs vary by the taxpayer's own age - only the basic
+# exemption limit changes (rates stay 5%/20%/30%); New Regime slabs
+# above are the same for every age group, so there's only one table.
+AGE_CATEGORY_BELOW_60 = "below_60"
+AGE_CATEGORY_SENIOR = "senior"  # 60 to below 80
+AGE_CATEGORY_SUPER_SENIOR = "super_senior"  # 80 and above
+
+OLD_REGIME_SLABS_BELOW_60 = [
     (250000, 0.00),
     (500000, 0.05),
     (1000000, 0.20),
     (float("inf"), 0.30),
 ]
+
+OLD_REGIME_SLABS_SENIOR = [
+    (300000, 0.00),
+    (500000, 0.05),
+    (1000000, 0.20),
+    (float("inf"), 0.30),
+]
+
+OLD_REGIME_SLABS_SUPER_SENIOR = [
+    (500000, 0.00),
+    (1000000, 0.20),
+    (float("inf"), 0.30),
+]
+
+OLD_REGIME_SLABS_BY_AGE = {
+    AGE_CATEGORY_BELOW_60: OLD_REGIME_SLABS_BELOW_60,
+    AGE_CATEGORY_SENIOR: OLD_REGIME_SLABS_SENIOR,
+    AGE_CATEGORY_SUPER_SENIOR: OLD_REGIME_SLABS_SUPER_SENIOR,
+}
+
+# Kept for backward compatibility - the below-60 table, same as before
+# age-based slabs were added.
+OLD_REGIME_SLABS = OLD_REGIME_SLABS_BELOW_60
 
 
 HEALTH_EDUCATION_CESS_RATE = 0.04  # 4%, same rate for both regimes
@@ -165,12 +195,18 @@ def calculate_new_regime_tax(taxable_income: float) -> float:
     return calculate_slab_tax(taxable_income, NEW_REGIME_SLABS)
 
 
-def calculate_old_regime_tax(taxable_income: float) -> float:
+def calculate_old_regime_tax(
+    taxable_income: float, age_category: str = AGE_CATEGORY_BELOW_60
+) -> float:
     """
-    Calculates tax using the Old Regime slabs (FY 2024-25),
-    for a taxpayer below 60 years of age.
+    Calculates tax using the Old Regime slabs (FY 2024-25). The basic
+    exemption limit depends on the taxpayer's own age - `age_category`
+    must be one of AGE_CATEGORY_BELOW_60 (default), AGE_CATEGORY_SENIOR
+    (60 to below 80), or AGE_CATEGORY_SUPER_SENIOR (80+). New Regime
+    has no such distinction - every age uses NEW_REGIME_SLABS.
     """
-    return calculate_slab_tax(taxable_income, OLD_REGIME_SLABS)
+    slabs = OLD_REGIME_SLABS_BY_AGE.get(age_category, OLD_REGIME_SLABS_BELOW_60)
+    return calculate_slab_tax(taxable_income, slabs)
 
 
 def calculate_hra_exemption(
@@ -438,3 +474,13 @@ if __name__ == "__main__":
         rebate_old_mr = calculate_87a_rebate(income_old_mr, tax_old_mr, is_new_regime=False)
         print(f"  Old Regime, ₹{income_old_mr:,} taxable: tax=₹{tax_old_mr:,.0f}, "
               f"rebate=₹{rebate_old_mr:,.0f}, net=₹{tax_old_mr - rebate_old_mr:,.0f}")
+
+    print("Senior Citizen / Super Senior Citizen Old Regime slabs (expect lower tax for higher age, same income):")
+    income_age_test = 900000
+    for label, category in [
+        ("Below 60", AGE_CATEGORY_BELOW_60),
+        ("Senior (60-79)", AGE_CATEGORY_SENIOR),
+        ("Super Senior (80+)", AGE_CATEGORY_SUPER_SENIOR),
+    ]:
+        tax_age = calculate_old_regime_tax(income_age_test, age_category=category)
+        print(f"  {label}, ₹{income_age_test:,} taxable: tax=₹{tax_age:,.0f}")

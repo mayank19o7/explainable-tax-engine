@@ -18,6 +18,7 @@ from tax_logic import (
     calculate_80ccd_2_deduction,
     calculate_80g_deduction,
     calculate_80d_deduction,
+    calculate_cess,
     compute_taxable_income,
     STANDARD_DEDUCTION_OLD_REGIME,
     STANDARD_DEDUCTION_NEW_REGIME,
@@ -132,10 +133,10 @@ with tab3:
         st.caption("Rent exemption under Sec 10(13A). Limit: least of HRA received, rent − 10% of Basic, or 40%/50% of Basic.")
         fc1, fc2 = st.columns(2)
         with fc1:
-            full_basic = st.number_input("Basic Salary (₹, annual)", min_value=0, value=1187094, key="full_basic")
-            full_hra_received = st.number_input("HRA Received (₹, annual)", min_value=0, value=593549, key="full_hra")
+            full_basic = st.number_input("Basic Salary (₹, annual)", min_value=0, value=1419288, key="full_basic")
+            full_hra_received = st.number_input("HRA Received (₹, annual)", min_value=0, value=709647, key="full_hra")
         with fc2:
-            full_rent_paid = st.number_input("Rent Paid (₹, annual)", min_value=0, value=250000, key="full_rent")
+            full_rent_paid = st.number_input("Rent Paid (₹, annual)", min_value=0, value=285000, key="full_rent")
             full_is_metro = st.checkbox("Metro city", value=False, key="full_metro")
 
     with st.container(border=True):
@@ -261,6 +262,12 @@ with tab3:
     )
     tax_new = calculate_new_regime_tax(taxable_income_new)
 
+    cess_old = calculate_cess(tax_old)
+    net_tax_old = tax_old + cess_old
+
+    cess_new = calculate_cess(tax_new)
+    net_tax_new = tax_new + cess_new
+
     st.divider()
     st.subheader("🧾 Result")
 
@@ -277,20 +284,24 @@ with tab3:
             st.write(f"80G Deduction: ₹{deduction_80g:,.0f}")
             st.write(f"80D Deduction: ₹{deduction_80d:,.0f}")
             st.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
-            st.metric("Tax", f"₹{tax_old:,.0f}")
+            st.metric("Tax Liability", f"₹{tax_old:,.0f}")
+            st.metric("Cess (4%)", f"₹{cess_old:,.0f}")
+            st.metric("Net Tax", f"₹{net_tax_old:,.0f}")
         with rc2:
             st.markdown("**New Regime**")
             st.write(f"Standard Deduction: ₹{STANDARD_DEDUCTION_NEW_REGIME:,.0f}")
             st.write(f"80CCD(2) Deduction: ₹{deduction_80ccd_2_new:,.0f}  (only deduction New Regime allows, capped at 14% for everyone)")
             st.write("HRA / 80C / 80CCD(1B) / PT / 80G / 80D: not allowed")
             st.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
-            st.metric("Tax", f"₹{tax_new:,.0f}")
+            st.metric("Tax Liability", f"₹{tax_new:,.0f}")
+            st.metric("Cess (4%)", f"₹{cess_new:,.0f}")
+            st.metric("Net Tax", f"₹{net_tax_new:,.0f}")
 
         st.divider()
-        if tax_old < tax_new:
-            st.success(f"Choose Old Regime. Tax Saving = ₹{tax_new - tax_old:,.0f}")
-        elif tax_new < tax_old:
-            st.success(f"Choose New Regime. Tax Saving = ₹{tax_old - tax_new:,.0f}")
+        if net_tax_old < net_tax_new:
+            st.success(f"Choose Old Regime. Tax Saving = ₹{net_tax_new - net_tax_old:,.0f}")
+        elif net_tax_new < net_tax_old:
+            st.success(f"Choose New Regime. Tax Saving = ₹{net_tax_old - net_tax_new:,.0f}")
         else:
             st.info("Both regimes result in the same tax.")
 

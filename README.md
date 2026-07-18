@@ -17,6 +17,7 @@ amount" — full traceability from source to final number.
 - [x] 80CCD(2) employer NPS deduction (allowed in both regimes; Old Regime 10% private/14% govt, New Regime 14% for everyone)
 - [x] 80G donations (simplified, 100% category)
 - [x] 80D (health insurance, self + parents, senior citizen limits)
+- [x] Health & Education Cess (4% on tax)
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

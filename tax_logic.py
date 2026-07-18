@@ -46,6 +46,22 @@ OLD_REGIME_SLABS = [
 ]
 
 
+HEALTH_EDUCATION_CESS_RATE = 0.04  # 4%, same rate for both regimes
+
+
+def calculate_cess(tax_amount: float, rate: float = HEALTH_EDUCATION_CESS_RATE) -> float:
+    """
+    Health & Education Cess: a flat 4% surcharge on top of your
+    computed tax (not on your income - on the TAX itself).
+    Same rate applies to both Old and New Regime.
+
+    Applied AFTER any rebate (e.g. Section 87A) - we haven't built
+    rebate yet, so for now this runs directly on slab tax. Once
+    rebate is added, this should run on (tax - rebate) instead.
+    """
+    return round(tax_amount * rate, 2)
+
+
 def calculate_slab_tax(taxable_income: float, slabs: list) -> float:
     """
     Generic progressive slab-tax calculator: walks through `slabs`
@@ -87,9 +103,6 @@ def calculate_old_regime_tax(taxable_income: float) -> float:
     return calculate_slab_tax(taxable_income, OLD_REGIME_SLABS)
 
 
-# This block only runs when you execute THIS file directly
-# (e.g. `python3 tax_logic.py`). It will NOT run when this file
-# is imported by app.py or by another script.
 def calculate_hra_exemption(
     basic: float,
     hra_received: float,
@@ -117,9 +130,6 @@ def calculate_hra_exemption(
     return round(exemption, 2)
 
 
-# This block only runs when you execute THIS file directly
-# (e.g. `python3 tax_logic.py`). It will NOT run when this file
-# is imported by app.py or by another script.
 def calculate_80c_deduction(invested_amount: float) -> float:
     """
     Section 80C: PF, LIC, ELSS, etc. Old Regime only.
@@ -322,3 +332,8 @@ if __name__ == "__main__":
     )
     print(f"  Self+family premium ₹30,000 (cap ₹25,000) + Parents premium ₹60,000, "
           f"senior citizens (cap ₹50,000) -> Deduction: ₹{deduction_80d:,.0f}")
+
+    print("Health & Education Cess (expect ₹20,969 on ₹5,24,220 tax, from payslip):")
+    cess = calculate_cess(524220)
+    print(f"  Cess: ₹{cess:,.0f}")
+    print(f"  Net Tax (Tax + Cess): ₹{524220 + cess:,.0f}  (payslip: ₹5,45,189)")

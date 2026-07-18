@@ -29,6 +29,8 @@ from tax_logic import (
     LIMIT_80D_SENIOR_CITIZEN,
     EMPLOYER_NPS_RATE_PRIVATE,
     EMPLOYER_NPS_RATE_GOVT,
+    REBATE_87A_INCOME_LIMIT_OLD_REGIME,
+    REBATE_87A_INCOME_LIMIT_NEW_REGIME,
 )
 
 st.title("Explainable Tax Engine")
@@ -275,19 +277,25 @@ with tab3:
             "Automatic - not something you enter. New Regime: taxable income "
             "≤ ₹7,00,000 → rebate up to ₹25,000. Old Regime: taxable income "
             "≤ ₹5,00,000 → rebate up to ₹12,500. Can only reduce tax to ₹0, "
-            "never below."
+            "never below. Marginal relief also applies just above these "
+            "thresholds, so net tax never jumps by more than the extra "
+            "income that pushed you over the limit."
         )
         rc_87a1, rc_87a2 = st.columns(2)
         with rc_87a1:
             st.metric("Old Regime Rebate", f"₹{rebate_old:,.0f}")
-            if rebate_old > 0:
-                st.caption(f"Applied - taxable income ₹{taxable_income_old:,.0f} is at/below ₹5,00,000.")
+            if taxable_income_old <= REBATE_87A_INCOME_LIMIT_OLD_REGIME:
+                st.caption(f"Full rebate - taxable income ₹{taxable_income_old:,.0f} is at/below ₹5,00,000.")
+            elif rebate_old > 0:
+                st.caption(f"Marginal relief - taxable income ₹{taxable_income_old:,.0f} is just above ₹5,00,000.")
             else:
                 st.caption(f"Not applied - taxable income ₹{taxable_income_old:,.0f} exceeds ₹5,00,000.")
         with rc_87a2:
             st.metric("New Regime Rebate", f"₹{rebate_new:,.0f}")
-            if rebate_new > 0:
-                st.caption(f"Applied - taxable income ₹{taxable_income_new:,.0f} is at/below ₹7,00,000.")
+            if taxable_income_new <= REBATE_87A_INCOME_LIMIT_NEW_REGIME:
+                st.caption(f"Full rebate - taxable income ₹{taxable_income_new:,.0f} is at/below ₹7,00,000.")
+            elif rebate_new > 0:
+                st.caption(f"Marginal relief - taxable income ₹{taxable_income_new:,.0f} is just above ₹7,00,000.")
             else:
                 st.caption(f"Not applied - taxable income ₹{taxable_income_new:,.0f} exceeds ₹7,00,000.")
 

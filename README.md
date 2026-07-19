@@ -19,7 +19,7 @@ amount" — full traceability from source to final number.
 - [x] 80D (health insurance, self + parents, senior citizen limits)
 - [x] Health & Education Cess (4% on tax)
 - [x] Section 288A/288B rounding (nearest ₹10, taxable income)
-- [x] Section 87A rebate (New Regime up to ₹7L, Old Regime up to ₹5L - zero tax)
+- [x] Section 87A rebate (year-dependent - New Regime up to ₹12L / cap ₹60,000 as of FY 2025-26+, was ₹7L / ₹25,000 pre-FY 2025-26; Old Regime up to ₹5L / cap ₹12,500, unchanged across years - zero tax below threshold)
 - [x] Section 87A marginal relief (just above the threshold)
 - [x] Senior Citizen (60-79) / Super Senior Citizen (80+) Old Regime slabs
 - [x] Surcharge for high incomes (>₹50L, with marginal relief; Old Regime 10/15/25/37%, New Regime capped at 25%)
@@ -27,6 +27,7 @@ amount" — full traceability from source to final number.
 - [x] 80TTA/80TTB deduction on Savings Bank + Deposit interest only (₹10,000 non-senior savings-only / ₹50,000 senior both-interest, Old Regime only)
 - [x] Full Computation tab redesigned as a single Old vs New Regime comparison table (section by section, with "Not Applicable" for regime-restricted items) + hover (ⓘ) tooltips on each input section
 - [x] ITR Settlement: enter Tax Already Paid (TDS/Advance Tax) and see Balance Payable / Refund per regime - handles the "employer deducted TDS under one regime/declaration, but final filing differs" scenario
+- [x] Tax Year dropdown (FY 2023-24 through FY 2026-27) - New Regime slabs and 87A rebate threshold/cap are looked up per year via `TAX_RULES_BY_YEAR`; Old Regime and all deduction limits stay constant across years since they haven't changed
 - [ ] Form16 / AIS / ITR import
 - [ ] Reconciliation engine
 - [ ] Explainability report (PDF export)

@@ -598,15 +598,24 @@ the non-negotiable rule governing this feature.
 
 Cross-checked the current implementation against real personal tax
 documents (salary/tax simulator sheet, an old tax-computation
-proforma, a filed ITR-2, and a monthly payslip/tax sheet). These are
-sections/rules present in those real documents but not yet built,
-kept here as a prioritized backlog. Items are removed from this list
-once implemented (and checked off in `README.md`).
+proforma, a filed ITR-2, a monthly payslip/tax sheet, and an
+employer-generated Tax Calculator sheet). These are sections/rules
+present in those real documents but not yet built, kept here as a
+prioritized backlog. Items are removed from this list once
+implemented (and checked off in `README.md`).
 
 ### Priority order
 
 1.  **House Property income** — Section 24(b) home loan interest
     exemption, self-occupied vs. let-out, loss from house property.
+    Bundle in two related items surfaced by a real employer tax sheet
+    (`dist/IncomeTaxCalculator.pdf`), used every payroll cycle:
+    -   **Section 10 exempt allowances** (LTA, conveyance, etc.) —
+        subtracted from Gross Salary before Standard Deduction/HRA;
+        currently not modeled at all.
+    -   **80EE / 80EEA** — additional home loan interest deductions
+        (older 2016-17 scheme / newer 2019-22 scheme), on top of the
+        regular Sec 24(b) interest exemption above.
 2.  **80E, 80GG, 80U, 80DD, 80DDB, broader 80G/80GGA/80GGC
     categories** — all present in the real documents, none built.
 3.  **Capital Gains module** — the real filed ITR-2 has a Capital

@@ -26,6 +26,9 @@ from tax_logic import (
     compute_taxable_income,
     STANDARD_DEDUCTION_OLD_REGIME,
     STANDARD_DEDUCTION_NEW_REGIME,
+    TAX_YEARS,
+    DEFAULT_TAX_YEAR,
+    get_tax_rules,
     LIMIT_80C,
     LIMIT_80CCD_1B,
     LIMIT_80D_NORMAL,
@@ -49,6 +52,15 @@ tab1, tab2, tab3 = st.tabs(["Regime Comparison", "HRA Calculator", "Full Computa
 with tab1:
     st.caption("Compare Old Regime vs New Regime")
 
+    fiscal_year_tab1 = st.selectbox(
+        "Tax Year",
+        TAX_YEARS,
+        index=TAX_YEARS.index(DEFAULT_TAX_YEAR),
+        key="fiscal_year_tab1",
+        help="New Regime slabs and its 87A rebate change almost every "
+        "Budget - Old Regime slabs haven't changed across these years.",
+    )
+
     salary = st.number_input(
         "Enter your annual taxable salary (₹)",
         min_value=0,
@@ -70,7 +82,7 @@ with tab1:
     )
     age_category = age_label_to_category[age_label]
 
-    new_tax = calculate_new_regime_tax(salary)
+    new_tax = calculate_new_regime_tax(salary, fiscal_year=fiscal_year_tab1)
     old_tax = calculate_old_regime_tax(salary, age_category=age_category)
 
     col1, col2 = st.columns(2)
@@ -138,6 +150,25 @@ with tab3:
     left_col, right_col = st.columns([1, 1])
 
     with left_col:
+        with st.container(border=True):
+            st.subheader(
+                "📅 Tax Year",
+                help=(
+                    "Which year's rules to calculate under. New Regime slabs "
+                    "and its 87A rebate threshold change almost every Budget - "
+                    "Old Regime slabs and all deduction limits (80C, 80D, etc.) "
+                    "haven't changed across these years."
+                ),
+            )
+            full_fiscal_year = st.selectbox(
+                "Financial Year",
+                TAX_YEARS,
+                index=TAX_YEARS.index(DEFAULT_TAX_YEAR),
+                key="full_fiscal_year",
+                format_func=lambda fy: f"{fy} ({get_tax_rules(fy)['ay_label']})",
+            )
+            full_tax_rules = get_tax_rules(full_fiscal_year)
+
         with st.container(border=True):
             st.subheader(
                 "🎂 Age Category",
@@ -450,7 +481,7 @@ with tab3:
 
     taxable_income_old = compute_taxable_income(
         gross_salary=gross_salary,
-        standard_deduction=STANDARD_DEDUCTION_OLD_REGIME,
+        standard_deduction=full_tax_rules["standard_deduction_old"],
         other_source_income=other_source_income,
         professional_tax=professional_tax,
         hra_exemption=hra_exemption,
@@ -469,15 +500,19 @@ with tab3:
     # taxable but gets no 80TTA/80TTB deduction.
     taxable_income_new = compute_taxable_income(
         gross_salary=gross_salary,
-        standard_deduction=STANDARD_DEDUCTION_NEW_REGIME,
+        standard_deduction=full_tax_rules["standard_deduction_new"],
         other_source_income=other_source_income,
         deduction_80ccd_2=deduction_80ccd_2_new,
     )
-    tax_new = calculate_new_regime_tax(taxable_income_new)
+    tax_new = calculate_new_regime_tax(taxable_income_new, fiscal_year=full_fiscal_year)
 
-    rebate_old = calculate_87a_rebate(taxable_income_old, tax_old, is_new_regime=False)
+    rebate_old = calculate_87a_rebate(
+        taxable_income_old, tax_old, is_new_regime=False, fiscal_year=full_fiscal_year
+    )
     tax_after_rebate_old = tax_old - rebate_old
-    rebate_new = calculate_87a_rebate(taxable_income_new, tax_new, is_new_regime=True)
+    rebate_new = calculate_87a_rebate(
+        taxable_income_new, tax_new, is_new_regime=True, fiscal_year=full_fiscal_year
+    )
     tax_after_rebate_new = tax_new - rebate_new
 
     surcharge_old = calculate_surcharge(
@@ -492,7 +527,9 @@ with tab3:
         taxable_income_new,
         tax_after_rebate_new,
         is_new_regime=True,
-        tax_calculator=calculate_new_regime_tax,
+        tax_calculator=lambda income: calculate_new_regime_tax(
+            income, fiscal_year=full_fiscal_year
+        ),
     )
 
     tax_plus_surcharge_old = tax_after_rebate_old + surcharge_old
@@ -528,8 +565,8 @@ with tab3:
             st.markdown("**💰 Income**")
             comparison_row(
                 "Standard Deduction",
-                STANDARD_DEDUCTION_OLD_REGIME,
-                STANDARD_DEDUCTION_NEW_REGIME,
+                full_tax_rules["standard_deduction_old"],
+                full_tax_rules["standard_deduction_new"],
             )
             if other_source_income > 0:
                 comparison_row(
@@ -594,7 +631,7 @@ with tab3:
                 st.info("Both regimes result in the same tax.")
 
         st.caption(
-            "87A Rebate has marginal relief just above ₹5L (Old) / ₹7L (New) taxable income. "
+            "87A Rebate has marginal relief just above ₹5L (Old) / ₹12L (New) taxable income. "
             "Surcharge (income > ₹50L) also has marginal relief per threshold; New Regime caps at 25%, "
             "Old Regime adds a 37% slab above ₹5Cr. 80CCD(2) assumes 14% (Govt) / 10% (private) of Basic "
             "under Old Regime and 14% for everyone under New Regime - some employers use a different base "

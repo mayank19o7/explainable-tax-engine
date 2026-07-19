@@ -8,7 +8,10 @@ Keeping this separate means:
 """
 
 # ---------------------------------------------------------------
-# Deduction/exemption limits (all in ₹, annual, FY 2024-25 rules).
+# Deduction/exemption limits (all in ₹, annual). Most are FY 2024-25
+# rules that haven't changed since (80C, 80D, HRA, etc.) - New Regime
+# slabs and its 87A rebate are the exception, updated for FY 2025-26+
+# per Budget 2025. See individual constants/docstrings for specifics.
 # Kept as named constants (rather than buried inside functions) so
 # they're easy to find, reuse, and eventually override per-year.
 # ---------------------------------------------------------------
@@ -28,19 +31,101 @@ HRA_RENT_THRESHOLD_RATE = 0.10  # rent paid minus 10% of Basic
 HRA_METRO_RATE = 0.50
 HRA_NON_METRO_RATE = 0.40
 
-# Standard deduction differs by regime (Budget 2024 revision).
+# Standard deduction differs by regime (Budget 2024 revision) and,
+# for New Regime, by year too - see TAX_RULES_BY_YEAR below for the
+# year-specific values actually used in calculations. These flat
+# constants are kept for backward compatibility and simply mirror
+# the latest supported year.
 STANDARD_DEDUCTION_OLD_REGIME = 50000
 STANDARD_DEDUCTION_NEW_REGIME = 75000
 
-# (upper limit of slab, tax rate for that slab)
-NEW_REGIME_SLABS = [
-    (300000, 0.00),
-    (700000, 0.05),
-    (1000000, 0.10),
-    (1200000, 0.15),
-    (1500000, 0.20),
-    (float("inf"), 0.30),
-]
+# ---------------------------------------------------------------
+# Year-specific tax rules. New Regime slabs and its 87A rebate have
+# changed almost every year via Budget announcements; everything else
+# (Old Regime slabs, 80C/80D/HRA limits, etc.) has stayed the same
+# across all of these years, so only what actually varies is stored
+# per-year here.
+# ---------------------------------------------------------------
+TAX_RULES_BY_YEAR = {
+    "FY 2023-24": {
+        "ay_label": "AY 2024-25",
+        "new_regime_slabs": [
+            (300000, 0.00),
+            (600000, 0.05),
+            (900000, 0.10),
+            (1200000, 0.15),
+            (1500000, 0.20),
+            (float("inf"), 0.30),
+        ],
+        "standard_deduction_new": 50000,  # first year New Regime got a standard deduction at all
+        "standard_deduction_old": 50000,
+        "rebate_new_threshold": 700000,
+        "rebate_new_cap": 25000,
+        "rebate_old_threshold": 500000,
+        "rebate_old_cap": 12500,
+    },
+    "FY 2024-25": {
+        "ay_label": "AY 2025-26",
+        "new_regime_slabs": [
+            (300000, 0.00),
+            (700000, 0.05),
+            (1000000, 0.10),
+            (1200000, 0.15),
+            (1500000, 0.20),
+            (float("inf"), 0.30),
+        ],
+        "standard_deduction_new": 75000,  # Budget 2024 raised it from 50,000
+        "standard_deduction_old": 50000,
+        "rebate_new_threshold": 700000,
+        "rebate_new_cap": 25000,
+        "rebate_old_threshold": 500000,
+        "rebate_old_cap": 12500,
+    },
+    "FY 2025-26": {
+        "ay_label": "AY 2026-27",
+        "new_regime_slabs": [
+            (400000, 0.00),
+            (800000, 0.05),
+            (1200000, 0.10),
+            (1600000, 0.15),
+            (2000000, 0.20),
+            (2400000, 0.25),
+            (float("inf"), 0.30),
+        ],
+        "standard_deduction_new": 75000,
+        "standard_deduction_old": 50000,
+        "rebate_new_threshold": 1200000,  # Budget 2025 raised this from 700,000
+        "rebate_new_cap": 60000,  # ... and this from 25,000
+        "rebate_old_threshold": 500000,
+        "rebate_old_cap": 12500,
+    },
+}
+
+# Budget 2026 made no changes to New Regime slabs or rebate - same
+# rules as FY 2025-26, just a new year/AY label.
+TAX_RULES_BY_YEAR["FY 2026-27"] = {
+    **TAX_RULES_BY_YEAR["FY 2025-26"],
+    "ay_label": "AY 2027-28",
+}
+
+# Dropdown options, oldest to newest.
+TAX_YEARS = list(TAX_RULES_BY_YEAR.keys())
+DEFAULT_TAX_YEAR = "FY 2026-27"  # current FY as of July 2026
+
+
+def get_tax_rules(fiscal_year: str) -> dict:
+    """
+    Looks up the rules dict for a given FY label (e.g. "FY 2025-26").
+    Falls back to DEFAULT_TAX_YEAR if the label isn't recognized,
+    rather than raising an error - keeps callers simple.
+    """
+    return TAX_RULES_BY_YEAR.get(fiscal_year, TAX_RULES_BY_YEAR[DEFAULT_TAX_YEAR])
+
+
+# (upper limit of slab, tax rate for that slab) - New Regime, latest
+# year. Kept for backward compatibility; calculate_new_regime_tax()
+# actually looks up the year-specific table above via fiscal_year.
+NEW_REGIME_SLABS = TAX_RULES_BY_YEAR[DEFAULT_TAX_YEAR]["new_regime_slabs"]
 
 # Old Regime slabs vary by the taxpayer's own age - only the basic
 # exemption limit changes (rates stay 5%/20%/30%); New Regime slabs
@@ -136,29 +221,37 @@ def round_to_nearest_10(amount: float) -> float:
 
 # Section 87A rebate: below a taxable income threshold, you get a
 # rebate that can zero out your tax entirely. Thresholds and rebate
-# caps differ by regime.
+# caps differ by regime. New Regime values below are FY 2025-26+
+# (Budget 2025 raised these from the old ₹7L/₹25,000; Budget 2026
+# kept them unchanged). Old Regime has never had a Budget revision.
 REBATE_87A_INCOME_LIMIT_OLD_REGIME = 500000
 REBATE_87A_MAX_AMOUNT_OLD_REGIME = 12500
 
-REBATE_87A_INCOME_LIMIT_NEW_REGIME = 700000
-REBATE_87A_MAX_AMOUNT_NEW_REGIME = 25000
+REBATE_87A_INCOME_LIMIT_NEW_REGIME = 1200000
+REBATE_87A_MAX_AMOUNT_NEW_REGIME = 60000
 
 
 def calculate_87a_rebate(
-    taxable_income: float, tax: float, is_new_regime: bool
+    taxable_income: float,
+    tax: float,
+    is_new_regime: bool,
+    fiscal_year: str = DEFAULT_TAX_YEAR,
 ) -> float:
     """
     Section 87A rebate: at/below the threshold, tax is reduced to zero
     (capped at max_rebate). Just above it, marginal relief tapers the
     rebate so net tax never rises by more than the excess income itself
-    - avoiding a hard cliff at the threshold.
+    - avoiding a hard cliff at the threshold. Threshold and cap are
+    year-specific for New Regime (see TAX_RULES_BY_YEAR); Old Regime's
+    have never changed across supported years.
     """
+    rules = get_tax_rules(fiscal_year)
     if is_new_regime:
-        income_limit = REBATE_87A_INCOME_LIMIT_NEW_REGIME
-        max_rebate = REBATE_87A_MAX_AMOUNT_NEW_REGIME
+        income_limit = rules["rebate_new_threshold"]
+        max_rebate = rules["rebate_new_cap"]
     else:
-        income_limit = REBATE_87A_INCOME_LIMIT_OLD_REGIME
-        max_rebate = REBATE_87A_MAX_AMOUNT_OLD_REGIME
+        income_limit = rules["rebate_old_threshold"]
+        max_rebate = rules["rebate_old_cap"]
 
     if taxable_income <= income_limit:
         return round(min(tax, max_rebate), 2)
@@ -269,23 +362,29 @@ def calculate_slab_tax(taxable_income: float, slabs: list) -> float:
     return round(tax, 2)
 
 
-def calculate_new_regime_tax(taxable_income: float) -> float:
+def calculate_new_regime_tax(
+    taxable_income: float, fiscal_year: str = DEFAULT_TAX_YEAR
+) -> float:
     """
-    Calculates tax using India's New Regime slabs for FY 2024-25
-    (AY 2025-26), as revised in Budget 2024.
+    Calculates tax using India's New Regime slabs for the given
+    fiscal year (e.g. "FY 2025-26") - see TAX_RULES_BY_YEAR for
+    supported years. Defaults to the current year if omitted.
     """
-    return calculate_slab_tax(taxable_income, NEW_REGIME_SLABS)
+    slabs = get_tax_rules(fiscal_year)["new_regime_slabs"]
+    return calculate_slab_tax(taxable_income, slabs)
 
 
 def calculate_old_regime_tax(
     taxable_income: float, age_category: str = AGE_CATEGORY_BELOW_60
 ) -> float:
     """
-    Calculates tax using the Old Regime slabs (FY 2024-25). The basic
-    exemption limit depends on the taxpayer's own age - `age_category`
-    must be one of AGE_CATEGORY_BELOW_60 (default), AGE_CATEGORY_SENIOR
-    (60 to below 80), or AGE_CATEGORY_SUPER_SENIOR (80+). New Regime
-    has no such distinction - every age uses NEW_REGIME_SLABS.
+    Calculates tax using the Old Regime slabs (FY 2024-25 rules,
+    unchanged since - Old Regime hasn't had a Budget revision).
+    The basic exemption limit depends on the taxpayer's own age -
+    `age_category` must be one of AGE_CATEGORY_BELOW_60 (default),
+    AGE_CATEGORY_SENIOR (60 to below 80), or AGE_CATEGORY_SUPER_SENIOR
+    (80+). New Regime has no such distinction - every age uses
+    NEW_REGIME_SLABS.
     """
     slabs = OLD_REGIME_SLABS_BY_AGE.get(age_category, OLD_REGIME_SLABS_BELOW_60)
     return calculate_slab_tax(taxable_income, slabs)
@@ -581,7 +680,7 @@ if __name__ == "__main__":
         print(f"  ₹{amount:,} -> ₹{round_to_nearest_10(amount):,}")
 
     print("Section 87A Rebate (expect zero tax at the threshold):")
-    income_new = 700000
+    income_new = 1200000
     tax_new_87a = calculate_new_regime_tax(income_new)
     rebate_new = calculate_87a_rebate(income_new, tax_new_87a, is_new_regime=True)
     print(
@@ -600,7 +699,7 @@ if __name__ == "__main__":
     print(
         "Section 87A Marginal Relief (expect net tax to rise gently just above the threshold):"
     )
-    for income_new_mr in [700100, 710000]:
+    for income_new_mr in [1200100, 1210000]:
         tax_new_mr = calculate_new_regime_tax(income_new_mr)
         rebate_new_mr = calculate_87a_rebate(
             income_new_mr, tax_new_mr, is_new_regime=True

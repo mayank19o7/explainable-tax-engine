@@ -20,7 +20,9 @@ LIMIT_80TTA = 10000  # non-seniors: savings account interest only
 LIMIT_80TTB_SENIOR = 50000  # seniors: ALL interest (savings + FD + post office etc.)
 
 EMPLOYER_NPS_RATE_PRIVATE = 0.10  # 80CCD(2) cap: 10% of Basic (private-sector employer)
-EMPLOYER_NPS_RATE_GOVT = 0.14  # 80CCD(2) cap: 14% of Basic (Central/State Govt employer)
+EMPLOYER_NPS_RATE_GOVT = (
+    0.14  # 80CCD(2) cap: 14% of Basic (Central/State Govt employer)
+)
 
 HRA_RENT_THRESHOLD_RATE = 0.10  # rent paid minus 10% of Basic
 HRA_METRO_RATE = 0.50
@@ -81,7 +83,9 @@ OLD_REGIME_SLABS = OLD_REGIME_SLABS_BELOW_60
 HEALTH_EDUCATION_CESS_RATE = 0.04  # 4%, same rate for both regimes
 
 
-def calculate_cess(tax_amount: float, rate: float = HEALTH_EDUCATION_CESS_RATE) -> float:
+def calculate_cess(
+    tax_amount: float, rate: float = HEALTH_EDUCATION_CESS_RATE
+) -> float:
     """
     Health & Education Cess: a flat 4% surcharge on top of your
     computed tax (not on your income - on the TAX itself).
@@ -94,10 +98,21 @@ def calculate_cess(tax_amount: float, rate: float = HEALTH_EDUCATION_CESS_RATE) 
     return round(tax_amount * rate, 2)
 
 
+def calculate_balance_tax_payable(
+    net_tax_liability: float, tax_already_paid: float
+) -> float:
+    """
+    What's left to settle at ITR filing time. Positive = additional
+    tax payable (e.g. TDS was deducted assuming fewer deductions/less
+    income than your final computation shows); negative = refund due.
+    """
+    return round(net_tax_liability - tax_already_paid, 2)
+
+
 def round_to_nearest_10(amount: float) -> float:
     """
-    Sections 288A and 288B of the Income Tax Act: taxable income must 
-    both be rounded to the nearest ₹10 (not just the nearest rupee, 
+    Sections 288A and 288B of the Income Tax Act: taxable income must
+    both be rounded to the nearest ₹10 (not just the nearest rupee,
     which is all we've done so far).
 
     Two steps, matching the law exactly:
@@ -129,22 +144,14 @@ REBATE_87A_INCOME_LIMIT_NEW_REGIME = 700000
 REBATE_87A_MAX_AMOUNT_NEW_REGIME = 25000
 
 
-def calculate_87a_rebate(taxable_income: float, tax: float, is_new_regime: bool) -> float:
+def calculate_87a_rebate(
+    taxable_income: float, tax: float, is_new_regime: bool
+) -> float:
     """
-    Section 87A rebate: if taxable income is at or below the regime's
-    threshold, you get a rebate - capped at the regime's max amount,
-    but never more than the tax you actually owe (so it can only
-    bring your tax down to zero, never negative).
-
-    Marginal relief: just above the threshold, without relief, tax
-    would jump sharply the moment income crosses the limit by even ₹1
-    (a hard cliff). The law prevents this: if income exceeds the
-    threshold only slightly, the rebate is reduced so that the net tax
-    payable never exceeds the amount of income above the threshold
-    (i.e. crossing the line by ₹1 can cost at most ₹1 more tax, not
-    the full slab tax). This tapers off naturally - once the excess
-    income is large enough that slab tax on it exceeds the tax itself,
-    no relief is given.
+    Section 87A rebate: at/below the threshold, tax is reduced to zero
+    (capped at max_rebate). Just above it, marginal relief tapers the
+    rebate so net tax never rises by more than the excess income itself
+    - avoiding a hard cliff at the threshold.
     """
     if is_new_regime:
         income_limit = REBATE_87A_INCOME_LIMIT_NEW_REGIME
@@ -164,14 +171,10 @@ def calculate_87a_rebate(taxable_income: float, tax: float, is_new_regime: bool)
     return 0.0
 
 
-# Surcharge: an extra percentage ON TOP OF the income tax itself (not
-# on income) for high earners. Applies above ₹50L taxable income, in
-# increasing steps. New Regime dropped the top 37% slab (Budget 2023),
-# capping New Regime surcharge at 25% regardless of how high income
-# goes; Old Regime still has the 37% top slab beyond ₹5Cr.
-# Each entry is (income threshold crossed, surcharge rate that then
-# applies to the WHOLE tax amount - not just the portion above the
-# threshold), in ascending order.
+# Surcharge: extra % on top of the tax itself (not income), for
+# taxable income above ₹50L. New Regime caps at 25% (Budget 2023 -
+# no 37% slab); Old Regime keeps the 37% slab beyond ₹5Cr.
+# Each entry: (income threshold, flat rate applied to the whole tax).
 SURCHARGE_BRACKETS_OLD_REGIME = [
     (5000000, 0.10),
     (10000000, 0.15),
@@ -193,25 +196,21 @@ def calculate_surcharge(
     tax_calculator,
 ) -> float:
     """
-    Surcharge on high incomes: taxable income > ₹50L pays an extra %
-    of the income tax itself (not of income). The rate is a single
-    flat % applied to the ENTIRE tax amount based on which bracket the
-    taxable income falls in - it isn't a portion-by-portion slab like
-    income tax itself.
+    Surcharge above ₹50L taxable income: a flat % of the tax itself,
+    based on which bracket the income falls in.
 
-    `tax_calculator` is the regime's own slab-tax function (e.g.
-    calculate_new_regime_tax, or a partial of calculate_old_regime_tax
-    bound to the taxpayer's age_category) - needed here to work out
-    "tax at exactly the threshold" for marginal relief below.
+    `tax_calculator` recomputes tax at the threshold (e.g.
+    calculate_new_regime_tax, or calculate_old_regime_tax bound to
+    age_category) - needed for the marginal relief check below.
 
-    Marginal relief: without it, crossing a threshold by even ₹1 would
-    add tens of thousands of rupees of surcharge in one jump (a hard
-    cliff, just like Section 87A's cliff). The law prevents this: the
-    combined (tax + surcharge) can never exceed (tax + surcharge at
-    the threshold, using the bracket BELOW) plus the extra income
-    above the threshold - so crossing by ₹1 costs at most ₹1 more.
+    Marginal relief: caps (tax + surcharge) so crossing a threshold by
+    ₹1 never costs more than ₹1 extra, same idea as 87A above.
     """
-    brackets = SURCHARGE_BRACKETS_NEW_REGIME if is_new_regime else SURCHARGE_BRACKETS_OLD_REGIME
+    brackets = (
+        SURCHARGE_BRACKETS_NEW_REGIME
+        if is_new_regime
+        else SURCHARGE_BRACKETS_OLD_REGIME
+    )
 
     applicable_rate = 0.0
     applicable_threshold = None
@@ -234,8 +233,8 @@ def calculate_surcharge(
     # have been at the threshold (using the bracket BELOW - i.e. the
     # rate that applied just before crossing) plus the excess income.
     tax_at_threshold = tax_calculator(applicable_threshold)
-    max_total_with_surcharge = (
-        tax_at_threshold * (1 + previous_rate) + (taxable_income - applicable_threshold)
+    max_total_with_surcharge = tax_at_threshold * (1 + previous_rate) + (
+        taxable_income - applicable_threshold
     )
 
     if total_with_surcharge > max_total_with_surcharge:
@@ -312,7 +311,9 @@ def calculate_hra_exemption(
     """
 
     option_1 = hra_received
-    option_2 = max(0, rent_paid - (HRA_RENT_THRESHOLD_RATE * basic))  # can't go negative
+    option_2 = max(
+        0, rent_paid - (HRA_RENT_THRESHOLD_RATE * basic)
+    )  # can't go negative
     option_3 = basic * (HRA_METRO_RATE if is_metro else HRA_NON_METRO_RATE)
 
     exemption = min(option_1, option_2, option_3)
@@ -427,7 +428,9 @@ def calculate_80d_deduction(
     ₹25,000 (self) + ₹50,000 (senior parents) = ₹75,000 total.
     """
     limit_self = LIMIT_80D_SENIOR_CITIZEN if self_senior_citizen else LIMIT_80D_NORMAL
-    limit_parents = LIMIT_80D_SENIOR_CITIZEN if parents_senior_citizen else LIMIT_80D_NORMAL
+    limit_parents = (
+        LIMIT_80D_SENIOR_CITIZEN if parents_senior_citizen else LIMIT_80D_NORMAL
+    )
 
     deduction_self = min(premium_self_family, limit_self)
     deduction_parents = min(premium_parents, limit_parents)
@@ -500,12 +503,18 @@ if __name__ == "__main__":
 
     print("80C Deduction (expect capped at ₹1,50,000):")
     print(f"  Invested ₹1,50,000 -> ₹{calculate_80c_deduction(150000):,.0f}")
-    print(f"  Invested ₹2,00,000 -> ₹{calculate_80c_deduction(200000):,.0f}  (over cap)")
-    print(f"  Invested ₹1,00,000 -> ₹{calculate_80c_deduction(100000):,.0f}  (under cap)")
+    print(
+        f"  Invested ₹2,00,000 -> ₹{calculate_80c_deduction(200000):,.0f}  (over cap)"
+    )
+    print(
+        f"  Invested ₹1,00,000 -> ₹{calculate_80c_deduction(100000):,.0f}  (under cap)"
+    )
 
     print("80CCD(1B) Deduction (expect capped at ₹50,000):")
     print(f"  Invested ₹50,000 -> ₹{calculate_80ccd_1b_deduction(50000):,.0f}")
-    print(f"  Invested ₹80,000 -> ₹{calculate_80ccd_1b_deduction(80000):,.0f}  (over cap)")
+    print(
+        f"  Invested ₹80,000 -> ₹{calculate_80ccd_1b_deduction(80000):,.0f}  (over cap)"
+    )
 
     print("Combined Taxable Income (Old Regime, annual figures from payslip):")
     hra_exempt_annual = calculate_hra_exemption(
@@ -548,15 +557,19 @@ if __name__ == "__main__":
     print(f"  Taxable Income (Old Regime, v2): ₹{taxable_old_v2:,.0f}")
     print(f"  Remaining gap vs payslip's ₹23,72,400: ₹{taxable_old_v2 - 2372400:,.0f}")
 
-    print("80D Deduction (health insurance, expect self=25,000 capped, parents=50,000 senior-capped):")
+    print(
+        "80D Deduction (health insurance, expect self=25,000 capped, parents=50,000 senior-capped):"
+    )
     deduction_80d = calculate_80d_deduction(
         premium_self_family=30000,
         premium_parents=60000,
         self_senior_citizen=False,
         parents_senior_citizen=True,
     )
-    print(f"  Self+family premium ₹30,000 (cap ₹25,000) + Parents premium ₹60,000, "
-          f"senior citizens (cap ₹50,000) -> Deduction: ₹{deduction_80d:,.0f}")
+    print(
+        f"  Self+family premium ₹30,000 (cap ₹25,000) + Parents premium ₹60,000, "
+        f"senior citizens (cap ₹50,000) -> Deduction: ₹{deduction_80d:,.0f}"
+    )
 
     print("Health & Education Cess (expect ₹20,969 on ₹5,24,220 tax, from payslip):")
     cess = calculate_cess(524220)
@@ -571,29 +584,45 @@ if __name__ == "__main__":
     income_new = 700000
     tax_new_87a = calculate_new_regime_tax(income_new)
     rebate_new = calculate_87a_rebate(income_new, tax_new_87a, is_new_regime=True)
-    print(f"  New Regime, ₹{income_new:,} taxable: tax=₹{tax_new_87a:,.0f}, "
-          f"rebate=₹{rebate_new:,.0f}, net=₹{tax_new_87a - rebate_new:,.0f}")
+    print(
+        f"  New Regime, ₹{income_new:,} taxable: tax=₹{tax_new_87a:,.0f}, "
+        f"rebate=₹{rebate_new:,.0f}, net=₹{tax_new_87a - rebate_new:,.0f}"
+    )
 
     income_old = 500000
     tax_old_87a = calculate_old_regime_tax(income_old)
     rebate_old = calculate_87a_rebate(income_old, tax_old_87a, is_new_regime=False)
-    print(f"  Old Regime, ₹{income_old:,} taxable: tax=₹{tax_old_87a:,.0f}, "
-          f"rebate=₹{rebate_old:,.0f}, net=₹{tax_old_87a - rebate_old:,.0f}")
+    print(
+        f"  Old Regime, ₹{income_old:,} taxable: tax=₹{tax_old_87a:,.0f}, "
+        f"rebate=₹{rebate_old:,.0f}, net=₹{tax_old_87a - rebate_old:,.0f}"
+    )
 
-    print("Section 87A Marginal Relief (expect net tax to rise gently just above the threshold):")
+    print(
+        "Section 87A Marginal Relief (expect net tax to rise gently just above the threshold):"
+    )
     for income_new_mr in [700100, 710000]:
         tax_new_mr = calculate_new_regime_tax(income_new_mr)
-        rebate_new_mr = calculate_87a_rebate(income_new_mr, tax_new_mr, is_new_regime=True)
-        print(f"  New Regime, ₹{income_new_mr:,} taxable: tax=₹{tax_new_mr:,.0f}, "
-              f"rebate=₹{rebate_new_mr:,.0f}, net=₹{tax_new_mr - rebate_new_mr:,.0f}")
+        rebate_new_mr = calculate_87a_rebate(
+            income_new_mr, tax_new_mr, is_new_regime=True
+        )
+        print(
+            f"  New Regime, ₹{income_new_mr:,} taxable: tax=₹{tax_new_mr:,.0f}, "
+            f"rebate=₹{rebate_new_mr:,.0f}, net=₹{tax_new_mr - rebate_new_mr:,.0f}"
+        )
 
     for income_old_mr in [500100, 510000]:
         tax_old_mr = calculate_old_regime_tax(income_old_mr)
-        rebate_old_mr = calculate_87a_rebate(income_old_mr, tax_old_mr, is_new_regime=False)
-        print(f"  Old Regime, ₹{income_old_mr:,} taxable: tax=₹{tax_old_mr:,.0f}, "
-              f"rebate=₹{rebate_old_mr:,.0f}, net=₹{tax_old_mr - rebate_old_mr:,.0f}")
+        rebate_old_mr = calculate_87a_rebate(
+            income_old_mr, tax_old_mr, is_new_regime=False
+        )
+        print(
+            f"  Old Regime, ₹{income_old_mr:,} taxable: tax=₹{tax_old_mr:,.0f}, "
+            f"rebate=₹{rebate_old_mr:,.0f}, net=₹{tax_old_mr - rebate_old_mr:,.0f}"
+        )
 
-    print("Senior Citizen / Super Senior Citizen Old Regime slabs (expect lower tax for higher age, same income):")
+    print(
+        "Senior Citizen / Super Senior Citizen Old Regime slabs (expect lower tax for higher age, same income):"
+    )
     income_age_test = 900000
     for label, category in [
         ("Below 60", AGE_CATEGORY_BELOW_60),
@@ -603,27 +632,49 @@ if __name__ == "__main__":
         tax_age = calculate_old_regime_tax(income_age_test, age_category=category)
         print(f"  {label}, ₹{income_age_test:,} taxable: tax=₹{tax_age:,.0f}")
 
-    print("Surcharge (expect surcharge to kick in above ₹50L, capped at 25% for New Regime beyond ₹2Cr):")
-    for income_sur, label in [(4900000, "Just below ₹50L"), (5100000, "Just above ₹50L"),
-                               (10100000, "Just above ₹1Cr"), (30000000, "₹3Cr (Old: 25%, New: 25%)"),
-                               (60000000, "₹6Cr (Old: 37% top slab, New: still capped 25%)")]:
+    print(
+        "Surcharge (expect surcharge to kick in above ₹50L, capped at 25% for New Regime beyond ₹2Cr):"
+    )
+    for income_sur, label in [
+        (4900000, "Just below ₹50L"),
+        (5100000, "Just above ₹50L"),
+        (10100000, "Just above ₹1Cr"),
+        (30000000, "₹3Cr (Old: 25%, New: 25%)"),
+        (60000000, "₹6Cr (Old: 37% top slab, New: still capped 25%)"),
+    ]:
         tax_new_sur = calculate_new_regime_tax(income_sur)
-        surcharge_new = calculate_surcharge(income_sur, tax_new_sur, is_new_regime=True,
-                                             tax_calculator=calculate_new_regime_tax)
+        surcharge_new = calculate_surcharge(
+            income_sur,
+            tax_new_sur,
+            is_new_regime=True,
+            tax_calculator=calculate_new_regime_tax,
+        )
         tax_old_sur = calculate_old_regime_tax(income_sur)
-        surcharge_old = calculate_surcharge(income_sur, tax_old_sur, is_new_regime=False,
-                                             tax_calculator=calculate_old_regime_tax)
-        print(f"  {label} (₹{income_sur:,}): "
-              f"New Regime tax=₹{tax_new_sur:,.0f}+surcharge=₹{surcharge_new:,.0f}, "
-              f"Old Regime tax=₹{tax_old_sur:,.0f}+surcharge=₹{surcharge_old:,.0f}")
+        surcharge_old = calculate_surcharge(
+            income_sur,
+            tax_old_sur,
+            is_new_regime=False,
+            tax_calculator=calculate_old_regime_tax,
+        )
+        print(
+            f"  {label} (₹{income_sur:,}): "
+            f"New Regime tax=₹{tax_new_sur:,.0f}+surcharge=₹{surcharge_new:,.0f}, "
+            f"Old Regime tax=₹{tax_old_sur:,.0f}+surcharge=₹{surcharge_old:,.0f}"
+        )
 
-    print("Section 80TTA/80TTB Deduction (expect non-senior capped at ₹10,000 savings-only, senior capped at ₹50,000 all-interest):")
+    print(
+        "Section 80TTA/80TTB Deduction (expect non-senior capped at ₹10,000 savings-only, senior capped at ₹50,000 all-interest):"
+    )
     non_senior_deduction = calculate_80tta_ttb_deduction(
         savings_interest=15000, fd_interest=40000, is_senior_citizen=False
     )
-    print(f"  Non-senior, savings=₹15,000 + FD=₹40,000 -> Deduction (80TTA, savings-only): ₹{non_senior_deduction:,.0f}")
+    print(
+        f"  Non-senior, savings=₹15,000 + FD=₹40,000 -> Deduction (80TTA, savings-only): ₹{non_senior_deduction:,.0f}"
+    )
 
     senior_deduction = calculate_80tta_ttb_deduction(
         savings_interest=15000, fd_interest=40000, is_senior_citizen=True
     )
-    print(f"  Senior, savings=₹15,000 + FD=₹40,000 -> Deduction (80TTB, capped ₹50,000): ₹{senior_deduction:,.0f}")
+    print(
+        f"  Senior, savings=₹15,000 + FD=₹40,000 -> Deduction (80TTB, capped ₹50,000): ₹{senior_deduction:,.0f}"
+    )

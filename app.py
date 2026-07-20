@@ -24,8 +24,6 @@ from tax_logic import (
     calculate_87a_rebate,
     calculate_surcharge,
     compute_taxable_income,
-    STANDARD_DEDUCTION_OLD_REGIME,
-    STANDARD_DEDUCTION_NEW_REGIME,
     TAX_YEARS,
     DEFAULT_TAX_YEAR,
     get_tax_rules,
@@ -44,77 +42,21 @@ st.set_page_config(page_title="Explainable Tax Engine", layout="wide")
 
 st.title("Explainable Tax Engine")
 
-tab1, tab2, tab3 = st.tabs(["Regime Comparison", "HRA Calculator", "Full Computation"])
+tab1, tab2 = st.tabs(["HRA Calculator", "Full Computation"])
 
 # -----------------------------------------------------------
-# Tab 1: same as Step 2
+# Tab 1: HRA Calculator
 # -----------------------------------------------------------
 with tab1:
-    st.caption("Compare Old Regime vs New Regime")
-
-    fiscal_year_tab1 = st.selectbox(
-        "Tax Year",
-        TAX_YEARS,
-        index=TAX_YEARS.index(DEFAULT_TAX_YEAR),
-        key="fiscal_year_tab1",
-        help="New Regime slabs and its 87A rebate change almost every "
-        "Budget - Old Regime slabs haven't changed across these years.",
-    )
-
-    salary = st.number_input(
-        "Enter your annual taxable salary (₹)",
-        min_value=0,
-        value=1000000,
-        step=10000,
-        key="salary_input",
-    )
-
-    age_label_to_category = {
-        "Below 60": AGE_CATEGORY_BELOW_60,
-        "Senior Citizen (60-79)": AGE_CATEGORY_SENIOR,
-        "Super Senior Citizen (80+)": AGE_CATEGORY_SUPER_SENIOR,
-    }
-    age_label = st.selectbox(
-        "Your age category (affects Old Regime basic exemption limit only - "
-        "New Regime slabs are the same for every age)",
-        list(age_label_to_category.keys()),
-        key="regime_cmp_age",
-    )
-    age_category = age_label_to_category[age_label]
-
-    new_tax = calculate_new_regime_tax(salary, fiscal_year=fiscal_year_tab1)
-    old_tax = calculate_old_regime_tax(salary, age_category=age_category)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Old Regime")
-        st.metric(label="Tax", value=f"₹{old_tax:,.0f}")
-    with col2:
-        st.subheader("New Regime")
-        st.metric(label="Tax", value=f"₹{new_tax:,.0f}")
-
-    st.divider()
-
-    if old_tax < new_tax:
-        st.success(f"Choose Old Regime. Tax Saving = ₹{new_tax - old_tax:,.0f}")
-    elif new_tax < old_tax:
-        st.success(f"Choose New Regime. Tax Saving = ₹{old_tax - new_tax:,.0f}")
-    else:
-        st.info("Both regimes result in the same tax.")
-
-# -----------------------------------------------------------
-# Tab 2: new - HRA Calculator
-# -----------------------------------------------------------
-with tab2:
     st.caption("HRA Exemption under Section 10(13A) - applies to Old Regime only")
 
-    c1, c2 = st.columns(2)
-    with c1:
+    column1, column2 = st.columns(2)
+    with column1:
         basic = st.number_input("Basic Salary (monthly ₹)", min_value=0, value=116097)
         hra_received = st.number_input(
             "HRA Received (monthly ₹)", min_value=0, value=58049
         )
-    with c2:
+    with column2:
         rent_paid = st.number_input("Rent Paid (monthly ₹)", min_value=0, value=25000)
         is_metro = st.checkbox("Metro city (Delhi/Mumbai/Kolkata/Chennai)", value=False)
 
@@ -123,14 +65,14 @@ with tab2:
     st.metric(label="HRA Exemption (monthly)", value=f"₹{exemption:,.0f}")
 
     st.write("**Why this number?** It's the least of:")
-    option_1 = hra_received
-    option_2 = max(0, rent_paid - (0.10 * basic))
-    option_3 = basic * (0.50 if is_metro else 0.40)
+    option1 = hra_received
+    option2 = max(0, rent_paid - (0.10 * basic))
+    option3 = basic * (0.50 if is_metro else 0.40)
 
     options = {
-        "Actual HRA received": option_1,
-        "Rent paid − 10% of Basic": option_2,
-        f"{'50' if is_metro else '40'}% of Basic": option_3,
+        "Actual HRA received": option1,
+        "Rent paid − 10% of Basic": option2,
+        f"{'50' if is_metro else '40'}% of Basic": option3,
     }
 
     for label, value in options.items():
@@ -138,9 +80,9 @@ with tab2:
         st.write(f"- {label}: ₹{value:,.0f}{won}")
 
 # -----------------------------------------------------------
-# Tab 3: Full Computation (everything combined)
+# Tab 2: Full Computation (everything combined)
 # -----------------------------------------------------------
-with tab3:
+with tab2:
     st.caption(
         "One flow: gross salary → exemptions/deductions → taxable income "
         "→ tax, computed separately per regime, since each regime allows "
@@ -151,44 +93,45 @@ with tab3:
 
     with left_col:
         with st.container(border=True):
-            st.subheader(
-                "📅 Tax Year",
-                help=(
-                    "Which year's rules to calculate under. New Regime slabs "
-                    "and its 87A rebate threshold change almost every Budget - "
-                    "Old Regime slabs and all deduction limits (80C, 80D, etc.) "
-                    "haven't changed across these years."
-                ),
-            )
-            full_fiscal_year = st.selectbox(
-                "Financial Year",
-                TAX_YEARS,
-                index=TAX_YEARS.index(DEFAULT_TAX_YEAR),
-                key="full_fiscal_year",
-                format_func=lambda fy: f"{fy} ({get_tax_rules(fy)['ay_label']})",
-            )
-            full_tax_rules = get_tax_rules(full_fiscal_year)
-
-        with st.container(border=True):
-            st.subheader(
-                "🎂 Age Category",
-                help=(
-                    "Sets your Old Regime basic exemption (₹2.5L below 60 / "
-                    "₹3L senior 60-79 / ₹5L super senior 80+) and your 80D "
-                    "senior-citizen status. New Regime slabs don't vary by age."
-                ),
-            )
-            full_age_label_to_category = {
-                "Below 60": AGE_CATEGORY_BELOW_60,
-                "Senior Citizen (60-79)": AGE_CATEGORY_SENIOR,
-                "Super Senior Citizen (80+)": AGE_CATEGORY_SUPER_SENIOR,
-            }
-            full_age_label = st.selectbox(
-                "Your age category",
-                list(full_age_label_to_category.keys()),
-                key="full_age",
-            )
-            full_age_category = full_age_label_to_category[full_age_label]
+            column1, column2 = st.columns(2)
+            with column1:
+                st.subheader(
+                    "📅 Tax Year",
+                    help=(
+                        "Which year's rules to calculate under. New Regime slabs "
+                        "and its 87A rebate threshold change almost every Budget - "
+                        "Old Regime slabs and all deduction limits (80C, 80D, etc.) "
+                        "haven't changed across these years."
+                    ),
+                )
+                full_fiscal_year = st.selectbox(
+                    "Financial Year",
+                    TAX_YEARS,
+                    index=TAX_YEARS.index(DEFAULT_TAX_YEAR),
+                    key="full_fiscal_year",
+                    format_func=lambda fy: f"{fy} ({get_tax_rules(fy)['ay_label']})",
+                )
+                full_tax_rules = get_tax_rules(full_fiscal_year)
+            with column2:
+                st.subheader(
+                    "🎂 Age Category",
+                    help=(
+                        "Sets your Old Regime basic exemption (₹2.5L below 60 / "
+                        "₹3L senior 60-79 / ₹5L super senior 80+) and your 80D senior-citizen status."
+                        "New Regime slabs don't vary by age."
+                    ),
+                )
+                full_age_label_to_category = {
+                    "Below 60": AGE_CATEGORY_BELOW_60,
+                    "Senior Citizen (60-79)": AGE_CATEGORY_SENIOR,
+                    "Super Senior Citizen (80+)": AGE_CATEGORY_SUPER_SENIOR,
+                }
+                full_age_label = st.selectbox(
+                    "Your age category",
+                    list(full_age_label_to_category.keys()),
+                    key="full_age",
+                )
+                full_age_category = full_age_label_to_category[full_age_label]
 
         with st.container(border=True):
             st.subheader(
@@ -196,6 +139,46 @@ with tab3:
             )
             gross_salary = st.number_input(
                 "Gross Salary (₹, annual)", min_value=0, value=2910444, key="full_gross"
+            )
+
+        with st.container(border=True):
+            st.subheader(
+                "🏠 HRA (Old Regime only)",
+                help="Sec 10(13A). Exemption = least of HRA received, rent − 10% of Basic, or 40%/50% of Basic.",
+            )
+            fc1, fc2 = st.columns(2)
+            with fc1:
+                full_basic = st.number_input(
+                    "Basic Salary (₹, annual)",
+                    min_value=0,
+                    value=1419288,
+                    key="full_basic",
+                )
+                full_hra_received = st.number_input(
+                    "HRA Received (₹, annual)",
+                    min_value=0,
+                    value=709647,
+                    key="full_hra",
+                )
+            with fc2:
+                full_rent_paid = st.number_input(
+                    "Rent Paid (₹, annual)", min_value=0, value=285000, key="full_rent"
+                )
+                full_is_metro = st.checkbox("Metro city", value=False, key="full_metro")
+
+        with st.container(border=True):
+            st.subheader(
+                "💳 Allowances u/s 11 (Earlier 10)",
+                help=(
+                    "Total of other eligible exempt allowances under Section 11. Do not include HRA. "
+                    "Like LTA, Transport, Children Education, etc."
+                ),
+            )
+            allowances_u_s_11 = st.number_input(
+                "Allowances u/s 11 (₹, annual)",
+                min_value=0,
+                value=0,
+                key="full_allowances_u_s_11",
             )
 
         with st.container(border=True):
@@ -286,31 +269,6 @@ with tab3:
                 value=2500,
                 key="full_pt",
             )
-
-        with st.container(border=True):
-            st.subheader(
-                "🏠 HRA (Old Regime only)",
-                help="Sec 10(13A). Exemption = least of HRA received, rent − 10% of Basic, or 40%/50% of Basic.",
-            )
-            fc1, fc2 = st.columns(2)
-            with fc1:
-                full_basic = st.number_input(
-                    "Basic Salary (₹, annual)",
-                    min_value=0,
-                    value=1419288,
-                    key="full_basic",
-                )
-                full_hra_received = st.number_input(
-                    "HRA Received (₹, annual)",
-                    min_value=0,
-                    value=709647,
-                    key="full_hra",
-                )
-            with fc2:
-                full_rent_paid = st.number_input(
-                    "Rent Paid (₹, annual)", min_value=0, value=285000, key="full_rent"
-                )
-                full_is_metro = st.checkbox("Metro city", value=False, key="full_metro")
 
         with st.container(border=True):
             st.subheader(
@@ -482,6 +440,7 @@ with tab3:
     taxable_income_old = compute_taxable_income(
         gross_salary=gross_salary,
         standard_deduction=full_tax_rules["standard_deduction_old"],
+        allowances_u_s_11=allowances_u_s_11,
         other_source_income=other_source_income,
         professional_tax=professional_tax,
         hra_exemption=hra_exemption,
@@ -500,6 +459,7 @@ with tab3:
     # taxable but gets no 80TTA/80TTB deduction.
     taxable_income_new = compute_taxable_income(
         gross_salary=gross_salary,
+        allowances_u_s_11=allowances_u_s_11,
         standard_deduction=full_tax_rules["standard_deduction_new"],
         other_source_income=other_source_income,
         deduction_80ccd_2=deduction_80ccd_2_new,
@@ -544,25 +504,75 @@ with tab3:
 
     NOT_APPLICABLE = "⛔ Not Applicable"
 
-    def comparison_row(label, old_val, new_val, old_ok=True, new_ok=True):
-        """One line item, Old Regime vs New Regime, side by side."""
-        rc1, rc2 = st.columns(2)
-        rc1.write(
-            f"{label}: {'₹{:,.0f}'.format(old_val) if old_ok else NOT_APPLICABLE}"
+    def comparison_row(
+        label, old_val, new_val, old_ok=True, new_ok=True, emphasize=False
+    ):
+        """
+        One line item, Old Regime vs New Regime, side by side.
+
+        Every row - whether it's a small deduction line or a big total
+        like Net Tax Payable - goes through this SAME function, so
+        everything uses identical column widths, fonts, and padding.
+        `emphasize=True` just bumps size/weight for key totals; it
+        never switches to a different widget type (e.g. st.metric),
+        which is what caused the misalignment before - metric cards
+        have their own built-in padding/font that doesn't match plain
+        text rows, so mixing the two made rows drift out of line.
+        """
+        label_col, old_col, new_col = st.columns([2, 1, 1])
+
+        font_size = "1.05rem" if emphasize else "0.9rem"
+        weight = "700" if emphasize else "400"
+        bg = (
+            "background-color:rgba(120,120,120,0.08); border-radius:4px;"
+            if emphasize
+            else ""
         )
-        rc2.write(
-            f"{label}: {'₹{:,.0f}'.format(new_val) if new_ok else NOT_APPLICABLE}"
+
+        label_col.markdown(
+            f"<div style='font-size:{font_size}; font-weight:{weight}; "
+            f"padding:6px 4px; {bg}'>{label}</div>",
+            unsafe_allow_html=True,
+        )
+        for col, val, ok in ((old_col, old_val, old_ok), (new_col, new_val, new_ok)):
+            text = f"₹{val:,.0f}" if ok else NOT_APPLICABLE
+            col.markdown(
+                f"<div style='text-align:center; font-size:{font_size}; "
+                f"font-weight:{weight}; padding:6px 4px; {bg}'>{text}</div>",
+                unsafe_allow_html=True,
+            )
+
+    def section_header(text):
+        """
+        Small-caps section label with an underline, used to visually
+        group rows without needing a heavy st.divider() between every
+        single section - dividers are reserved for the few places that
+        mark a genuine phase change (inputs done -> now computing tax;
+        tax done -> here's the final number).
+        """
+        st.markdown(
+            f"<div style='font-size:0.8rem; font-weight:700; text-transform:uppercase; "
+            f"letter-spacing:0.05em; color:rgba(120,120,120,0.9); margin-top:16px; "
+            f"margin-bottom:4px; border-bottom:1px solid rgba(120,120,120,0.25); "
+            f"padding-bottom:4px;'>{text}</div>",
+            unsafe_allow_html=True,
         )
 
     with right_col:
         st.subheader("🧾 Regime Comparison")
 
         with st.container(border=True):
-            rc1, rc2 = st.columns(2)
-            rc1.markdown("### Old Regime")
-            rc2.markdown("### New Regime")
+            header_label, header_old, header_new = st.columns([1.5, 1, 1])
+            header_old.markdown(
+                "<div style='text-align:center;'><h4>Old Regime</h4></div>",
+                unsafe_allow_html=True,
+            )
+            header_new.markdown(
+                "<div style='text-align:center;'><h4>New Regime</h4></div>",
+                unsafe_allow_html=True,
+            )
 
-            st.markdown("**💰 Income**")
+            section_header("💰 Income")
             comparison_row(
                 "Standard Deduction",
                 full_tax_rules["standard_deduction_old"],
@@ -573,9 +583,10 @@ with tab3:
                     "Other Source Income", other_source_income, other_source_income
                 )
 
-            st.markdown("**📉 Exemptions & Deductions**")
+            section_header("📉 Exemptions & Deductions")
             comparison_row("Professional Tax", professional_tax, 0, new_ok=False)
             comparison_row("HRA Exemption", hra_exemption, 0, new_ok=False)
+            comparison_row("Allowances u/s 11", allowances_u_s_11, allowances_u_s_11)
             comparison_row("80C Deduction", deduction_80c, 0, new_ok=False)
             comparison_row("80CCD(1B) Deduction", deduction_80ccd_1b, 0, new_ok=False)
             comparison_row(
@@ -588,37 +599,62 @@ with tab3:
                     "80TTA/80TTB Deduction", deduction_80tta_ttb, 0, new_ok=False
                 )
 
-            st.markdown("**🧮 Tax**")
-            rc1, rc2 = st.columns(2)
-            rc1.metric("Taxable Income", f"₹{taxable_income_old:,.0f}")
-            rc2.metric("Taxable Income", f"₹{taxable_income_new:,.0f}")
-            rc1, rc2 = st.columns(2)
-            rc1.metric("Tax Liability", f"₹{tax_old:,.0f}")
-            rc2.metric("Tax Liability", f"₹{tax_new:,.0f}")
+            section_header("🧮 Taxable Income & Tax")
+            comparison_row(
+                "Taxable Income", taxable_income_old, taxable_income_new, emphasize=True
+            )
+            comparison_row("Tax Liability", tax_old, tax_new, emphasize=True)
+
+            if (
+                rebate_old > 0
+                or rebate_new > 0
+                or surcharge_old > 0
+                or surcharge_new > 0
+            ):
+                section_header("➖ Rebate, Surcharge & Cess")
+            else:
+                section_header("➖ Cess")
             if rebate_old > 0 or rebate_new > 0:
                 comparison_row("Section 87A Rebate", rebate_old, rebate_new)
             if surcharge_old > 0 or surcharge_new > 0:
                 comparison_row("Surcharge", surcharge_old, surcharge_new)
             comparison_row("Cess (4%)", cess_old, cess_new)
-            rc1, rc2 = st.columns(2)
-            rc1.metric("Net Tax", f"₹{net_tax_old:,.0f}")
-            rc2.metric("Net Tax", f"₹{net_tax_new:,.0f}")
+
+            comparison_row("Net Tax Payable", net_tax_old, net_tax_new, emphasize=True)
 
             if tax_already_paid > 0:
-                st.markdown("**💵 ITR Settlement**")
+                section_header("💵 ITR Settlement")
                 comparison_row(
                     "Tax Already Paid (TDS)", tax_already_paid, tax_already_paid
                 )
-                bc1, bc2 = st.columns(2)
-                for col, balance in ((bc1, balance_old), (bc2, balance_new)):
-                    if balance > 0:
-                        col.error(f"Payable: ₹{balance:,.0f}")
-                    elif balance < 0:
-                        col.success(f"Refund: ₹{-balance:,.0f}")
-                    else:
-                        col.info("Settled: ₹0")
+                balance_label_col, bc1, bc2 = st.columns([2, 1, 1])
 
-            st.divider()
+                def balance_box(balance):
+                    rounded = round(
+                        balance
+                    )  # avoid float noise (-0.2) misreading as Refund
+                    if rounded > 0:
+                        status, amount = "Payable", rounded
+                        bg, fg = "rgba(239,68,68,0.15)", "#f87171"
+                    elif rounded < 0:
+                        status, amount = "Refund", -rounded
+                        bg, fg = "rgba(34,197,94,0.15)", "#4ade80"
+                    else:
+                        status, amount = "Settled", 0
+                        bg, fg = "rgba(59,130,246,0.15)", "#60a5fa"
+                    return (
+                        f"<div style='background-color:{bg}; color:{fg}; "
+                        f"border-radius:8px; padding:8px 6px; text-align:center; "
+                        f"line-height:1.3;'>"
+                        f"<div style='font-size:0.75rem; opacity:0.85;'>{status}</div>"
+                        f"<div style='font-size:1rem; font-weight:700;'>₹{amount:,.0f}</div>"
+                        f"</div>"
+                    )
+
+                bc1.markdown(balance_box(balance_old), unsafe_allow_html=True)
+                bc2.markdown(balance_box(balance_new), unsafe_allow_html=True)
+
+            section_header("")
             if net_tax_old < net_tax_new:
                 st.success(
                     f"Choose Old Regime. Tax Saving = ₹{net_tax_new - net_tax_old:,.0f}"

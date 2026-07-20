@@ -438,6 +438,7 @@ def calculate_80ccd_1b_deduction(nps_invested_amount: float) -> float:
 def compute_taxable_income(
     gross_salary: float,
     standard_deduction: float,
+    allowances_u_s_11: float = 0,
     other_source_income: float = 0,
     professional_tax: float = 0,
     hra_exemption: float = 0,
@@ -472,6 +473,7 @@ def compute_taxable_income(
         - standard_deduction
         - professional_tax
         - hra_exemption
+        - allowances_u_s_11
         - deduction_80c
         - deduction_80ccd_1b
         - deduction_80ccd_2
